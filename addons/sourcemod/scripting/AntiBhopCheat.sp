@@ -662,6 +662,7 @@ void Discord_Notify(int client, const char[] reason, const char[] stats)
 	GetCurrentMap(currentMap, sizeof(currentMap));
 
 	Format(sMessage, sizeof(sMessage), "*%s - %s* ```%s```", currentMap, sTime, message);
+	ReplaceString(sMessage, sizeof(sMessage), "\n", "\\n", false);
 
 	Discord_SendMessage(sWebhook, sMessage);
 }
