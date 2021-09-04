@@ -651,7 +651,7 @@ void Discord_Notify(int client, const char[] reason, const char[] stats)
 	Format(sWebhook, sizeof(sWebhook), "antibhopcheat");
 
 	char message[4096];
-	Format(message, sizeof(message), "%L has been detected for %s.```%s```", client, reason, stats);
+	Format(message, sizeof(message), "%L has been detected for **%s**.```%s```", client, reason, stats);
 
 	char sMessage[4096];
 	char sTime[64];
@@ -661,7 +661,7 @@ void Discord_Notify(int client, const char[] reason, const char[] stats)
 	char currentMap[PLATFORM_MAX_PATH];
 	GetCurrentMap(currentMap, sizeof(currentMap));
 
-	Format(sMessage, sizeof(sMessage), "*%s - %s* ```%s```", currentMap, sTime, message);
+	Format(sMessage, sizeof(sMessage), "```%s - %s``` %s", currentMap, sTime, message);
 	ReplaceString(sMessage, sizeof(sMessage), "\n", "\\n", false);
 
 	Discord_SendMessage(sWebhook, sMessage);
