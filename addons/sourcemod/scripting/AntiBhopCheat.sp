@@ -13,25 +13,31 @@
 #define VALID_MIN_JUMPS 3
 #define VALID_MAX_TICKS 5
 #define VALID_MIN_VELOCITY 250
+#define PLUGIN_VERSION "1.4"
 
 int g_aButtons[MAXPLAYERS + 1];
 bool g_bOnGround[MAXPLAYERS + 1];
 bool g_bHoldingJump[MAXPLAYERS + 1];
 bool g_bInJump[MAXPLAYERS + 1];
+bool g_bNoSound = false;
 
 CPlayer g_aPlayers[MAXPLAYERS + 1];
+EngineVersion gEV_Type = Engine_Unknown;
+
+ConVar g_cDetectionSound = null;
 
 // Api
 Handle g_hOnClientDetected;
 
 char g_sStats[4096];
+char g_sBeepSound[PLATFORM_MAX_PATH];
 
 public Plugin myinfo =
 {
 	name			= "AntiBhopCheat",
-	author			= "BotoX",
+	author			= "BotoX, .Rushaway",
 	description		= "Detect all kinds of bhop cheats",
-	version			= "0.0",
+	version			= PLUGIN_VERSION,
 	url				= ""
 };
 
@@ -40,8 +46,12 @@ public void OnPluginStart()
 {
 	LoadTranslations("common.phrases");
 
+	g_cDetectionSound = CreateConVar("sm_antibhopcheat_detection_sound", "1", "Emit a beep sound when someone gets flagged [0 = disabled, 1 = enabled]", 0, true, 0.0, true, 1.0);
+
 	RegAdminCmd("sm_stats", Command_Stats, ADMFLAG_GENERIC, "sm_stats <#userid|name>");
 	RegAdminCmd("sm_streak", Command_Streak, ADMFLAG_GENERIC, "sm_streak <#userid|name> [streak]");
+
+	AutoExecConfig(true);
 
 	/* Handle late load */
 	for(int client = 1; client <= MaxClients; client++)
@@ -56,6 +66,26 @@ public void OnPluginStart()
 	// Api
 	g_hOnClientDetected = CreateGlobalForward("AntiBhopCheat_OnClientDetected", ET_Ignore, Param_Cell, Param_String, Param_String);
 }
+
+public void OnMapStart()
+{
+	Handle hConfig = LoadGameConfigFile("funcommands.games");
+
+	if(hConfig == null)
+	{
+		SetFailState("Unable to load game config funcommands.games");
+
+		return;
+	}
+	
+	if(GameConfGetKeyValue(hConfig, "SoundBeep", g_sBeepSound, PLATFORM_MAX_PATH))
+	{
+		PrecacheSound(g_sBeepSound, true);
+	}
+
+	delete hConfig;
+}
+
 
 public void OnClientPutInServer(int client)
 {
@@ -360,20 +390,34 @@ void NotifyAdmins(int client, const char[] sReason)
 	{
 		if(IsClientInGame(i) && !IsFakeClient(i) && CheckCommandAccess(i, "sm_stats", ADMFLAG_GENERIC))
 		{
-			CPrintToChat(i, "{green}[SM]{default} %L has been detected for {red}%s{default}, please check your console!", client, sReason);
+			CPrintToChat(i, "{green}[SM]{red} %L {default}has been detected for {red}%s{default}", client, sReason);
+			CPrintToChat(i, "{green}[SM]{red} Please check your console if it's not a false flag!", client);
 			PrintStats(i, client);
 			PrintStreak(i, client, -1, true);
+
+			if(!g_bNoSound && g_cDetectionSound.BoolValue)
+			{
+				if(gEV_Type == Engine_CSS || gEV_Type == Engine_TF2)
+				{
+					EmitSoundToClient(i, g_sBeepSound);
+				}
+				else
+				{
+					ClientCommand(i, "play */%s", g_sBeepSound);
+				}
+			}
 		}
 	}
 
 	Forward_OnDetected(client, sReason, g_sStats);
+	g_bNoSound = false;
 }
 
 public Action Command_Stats(int client, int argc)
 {
 	if(argc < 1 || argc > 2)
 	{
-		ReplyToCommand(client, "[SM] Usage: sm_stats <#userid|name>");
+		CReplyToCommand(client, "{green}[SM] {default}Usage: sm_stats <#userid|name>");
 		return Plugin_Handled;
 	}
 
@@ -439,7 +483,7 @@ public Action Command_Streak(int client, int argc)
 {
 	if(argc < 1 || argc > 2)
 	{
-		ReplyToCommand(client, "[SM] Usage: sm_streak <#userid|name> [streak]");
+		CReplyToCommand(client, "{green}[SM] {default}Usage: sm_streak <#userid|name> [streak]");
 		return Plugin_Handled;
 	}
 
@@ -498,14 +542,14 @@ void PrintStreak(int client, int iTarget, int iStreak, bool bDetected=false)
 	{
 		if(iStreak > MAX_STREAKS)
 		{
-			ReplyToCommand(client, "[SM] Streak is out of bounds (max. %d)!", MAX_STREAKS);
+			CReplyToCommand(client, "{green}[SM] {default}Streak is out of bounds (max. %d)!", MAX_STREAKS);
 			return;
 		}
 
 		int iIndex = iStreaks - iStreak;
 		if(iIndex < 0)
 		{
-			ReplyToCommand(client, "[SM] Only %d streaks are available for this player right now!", iStreaks);
+			CReplyToCommand(client, "{green}[SM] {default}Only {olive}%d {default}streaks are available for this player right now!", iStreaks);
 			return;
 		}
 
@@ -661,7 +705,7 @@ void Discord_Notify(int client, const char[] reason, const char[] stats)
 	char currentMap[PLATFORM_MAX_PATH];
 	GetCurrentMap(currentMap, sizeof(currentMap));
 
-	Format(sMessage, sizeof(sMessage), "```%s - %s``` %s", currentMap, sTime, message);
+	Format(sMessage, sizeof(sMessage), "```(v:%s) %s on %s``` %s", PLUGIN_VERSION, sTime, currentMap, message);
 	ReplaceString(sMessage, sizeof(sMessage), "\n", "\\n", false);
 
 	Discord_SendMessage(sWebhook, sMessage);
