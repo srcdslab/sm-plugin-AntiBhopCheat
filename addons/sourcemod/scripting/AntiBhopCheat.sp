@@ -13,7 +13,7 @@
 #define VALID_MIN_JUMPS 3
 #define VALID_MAX_TICKS 5
 #define VALID_MIN_VELOCITY 250
-#define PLUGIN_VERSION "1.4"
+#define PLUGIN_VERSION "1.4.1"
 
 int g_aButtons[MAXPLAYERS + 1];
 bool g_bOnGround[MAXPLAYERS + 1];
@@ -602,7 +602,7 @@ void PrintStreak(int client, int iTarget, int iStreak, bool bDetected=false)
 		float fOutVel = hJump.fEndVel;
 		int iEndTick = hJump.iEndTick;
 
-		static char sPattern[512];
+		static char sPattern[1024];
 		int iPatternLen = 0;
 		int iPrevTick = -1;
 		int iTicks;
