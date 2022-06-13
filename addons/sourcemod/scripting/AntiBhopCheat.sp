@@ -3,6 +3,14 @@
 #include <multicolors>
 #include <SelectiveBhop>
 #tryinclude <Discord>
+#tryinclude <sourcebanschecker>
+
+#if !defined _Discord_Included
+	#warning "Discord.inc" include file not found, some features may not work!
+#endif
+#if !defined _sourcebanschecker_included
+	#warning "sourcebanschecker.inc" include file not found, some features may not work!
+#endif
 
 #include <basic>
 #include <CJump>
@@ -13,7 +21,7 @@
 #define VALID_MIN_JUMPS 3
 #define VALID_MAX_TICKS 5
 #define VALID_MIN_VELOCITY 250
-#define PLUGIN_VERSION "1.4.1"
+#define PLUGIN_VERSION "1.5.1"
 
 int g_aButtons[MAXPLAYERS + 1];
 bool g_bOnGround[MAXPLAYERS + 1];
@@ -25,6 +33,8 @@ CPlayer g_aPlayers[MAXPLAYERS + 1];
 EngineVersion gEV_Type = Engine_Unknown;
 
 ConVar g_cDetectionSound = null;
+ConVar g_cCountBots = null;
+ConVar g_cvKickBhopHack;
 
 // Api
 Handle g_hOnClientDetected;
@@ -47,6 +57,8 @@ public void OnPluginStart()
 	LoadTranslations("common.phrases");
 
 	g_cDetectionSound = CreateConVar("sm_antibhopcheat_detection_sound", "1", "Emit a beep sound when someone gets flagged [0 = disabled, 1 = enabled]", 0, true, 0.0, true, 1.0);
+	g_cvKickBhopHack = CreateConVar("sm_antibhopcheat_kick_hack", "0", "Automaticly Kick if a player is flagged for HACK? [0 = disabled, 1 = enabled]", FCVAR_NOTIFY, true, 0.0, true, 1.0);
+	g_cCountBots = CreateConVar("sm_antibhopcheat_count_bots", "1", "Should we count bots as players ?[0 = No, 1 = Yes]", FCVAR_NOTIFY, true, 0.0, true, 1.0);
 
 	RegAdminCmd("sm_stats", Command_Stats, ADMFLAG_GENERIC, "sm_stats <#userid|name>");
 	RegAdminCmd("sm_streak", Command_Streak, ADMFLAG_GENERIC, "sm_streak <#userid|name> [streak]");
@@ -343,7 +355,11 @@ void DoStats(CPlayer Player, CStreak CurStreak, CJump hJump)
 		{
 			Player.bFlagged = true;
 			NotifyAdmins(client, "bhop hack streak");
-//			KickClient(client, "Turn off your hack!");
+			if(g_cvKickBhopHack.IntValue == 1)
+			{
+				KickClient(client, "Turn off your hack!");
+				LogAction(-1, client, "[AntiBhopCheat] \"%L\" was kicked for using bhop hack streak.", client);
+			}
 			return;
 		}
 
@@ -366,8 +382,12 @@ void DoStats(CPlayer Player, CStreak CurStreak, CJump hJump)
 		if(HackRatio >= 0.65 && !Player.bFlagged)
 		{
 			Player.bFlagged = true;
-			NotifyAdmins(client, "bhop hack global");
-//			KickClient(client, "Turn off your hack!");
+			NotifyAdmins(client, "global bhop hack");
+			if(g_cvKickBhopHack.IntValue == 1)
+			{
+				KickClient(client, "Turn off your hack!");
+				LogAction(-1, client, "[AntiBhopCheat] \"%L\" was kicked for using global bhop hack.", client);
+			}
 			return;
 		}
 
@@ -398,13 +418,9 @@ void NotifyAdmins(int client, const char[] sReason)
 			if(!g_bNoSound && g_cDetectionSound.BoolValue)
 			{
 				if(gEV_Type == Engine_CSS || gEV_Type == Engine_TF2)
-				{
 					EmitSoundToClient(i, g_sBeepSound);
-				}
 				else
-				{
 					ClientCommand(i, "play */%s", g_sBeepSound);
-				}
 			}
 		}
 	}
@@ -694,19 +710,34 @@ void Discord_Notify(int client, const char[] reason, const char[] stats)
 	char sWebhook[64];
 	Format(sWebhook, sizeof(sWebhook), "antibhopcheat");
 
-	char message[4096];
-	Format(message, sizeof(message), "%L has been detected for **%s**.```%s```", client, reason, stats);
+	char sAuth[32];
+	GetClientAuthId(client, AuthId_Steam2, sAuth, sizeof(sAuth), true);
 
-	char sMessage[4096];
+	char sPlayer[4096];
+	#if defined _sourcebanschecker_included
+		Format(sPlayer, sizeof(sPlayer), "%N (%d bans - %d comms) [%s] has been detected for %s.", client, SBCheckerGetClientsBans(client), SBCheckerGetClientsComms(client), sAuth, reason);
+	#else
+		Format(sPlayer, sizeof(sPlayer), "%N [%s] has been detected for %s.", client, sAuth, reason);
+	#endif
+
+	char sStats[4096];
+	Format(sStats, sizeof(sStats), "%s", stats);
+
 	char sTime[64];
 	int iTime = GetTime();
-	FormatTime(sTime, sizeof(sTime), "%m/%d/%Y @ %H:%M:%S", iTime);
+	FormatTime(sTime, sizeof(sTime), "Date : %d/%m/%Y @ %H:%M:%S", iTime);
+
+	char sCount[64];
+	int iMaxPlayers = MaxClients;
+	int iConnected = GetClientCountEx(g_cCountBots.BoolValue);
+	Format(sCount, sizeof(sCount), "Players : %d/%d", iConnected, iMaxPlayers);
 
 	char currentMap[PLATFORM_MAX_PATH];
 	GetCurrentMap(currentMap, sizeof(currentMap));
 
-	Format(sMessage, sizeof(sMessage), "```(v:%s) %s on %s``` %s", PLUGIN_VERSION, sTime, currentMap, message);
-	ReplaceString(sMessage, sizeof(sMessage), "\n", "\\n", false);
+	char sMessage[4096];
+	Format(sMessage, sizeof(sMessage), "```%s \nCurrent map :%s \n%s \n%s \nV.%s \n\n%s```", sPlayer, currentMap, sTime, sCount, PLUGIN_VERSION, sStats);
+	ReplaceString(sMessage, sizeof(sMessage), "\\n", "\n");
 
 	Discord_SendMessage(sWebhook, sMessage);
 }
@@ -724,4 +755,22 @@ bool Forward_OnDetected(int client, const char[] reason, const char[] stats)
 #endif
 
 	g_sStats = "";
+}
+
+stock int GetClientCountEx(bool countBots)
+{
+	int iRealClients = 0;
+	int iFakeClients = 0;
+
+	for(int player = 1; player <= MaxClients; player++)
+	{
+		if(IsClientConnected(player))
+		{
+			if(IsFakeClient(player))
+				iFakeClients++;
+			else
+				iRealClients++;
+		}
+	}
+	return countBots ? iFakeClients + iRealClients : iRealClients;
 }
