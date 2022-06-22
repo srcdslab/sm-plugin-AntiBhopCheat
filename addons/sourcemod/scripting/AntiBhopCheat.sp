@@ -21,7 +21,7 @@
 #define VALID_MIN_JUMPS 3
 #define VALID_MAX_TICKS 5
 #define VALID_MIN_VELOCITY 250
-#define PLUGIN_VERSION "1.5.1"
+#define PLUGIN_VERSION "1.5.2"
 
 int g_aButtons[MAXPLAYERS + 1];
 bool g_bOnGround[MAXPLAYERS + 1];
@@ -410,8 +410,8 @@ void NotifyAdmins(int client, const char[] sReason)
 	{
 		if(IsClientInGame(i) && !IsFakeClient(i) && CheckCommandAccess(i, "sm_stats", ADMFLAG_GENERIC))
 		{
-			CPrintToChat(i, "{green}[SM]{red} %L {default}has been detected for {red}%s{default}", client, sReason);
-			CPrintToChat(i, "{green}[SM]{red} Please check your console if it's not a false flag!", client);
+			CPrintToChat(i, "{green}[SM]{red} %N {default}has been detected for {red}%s{default}", client, sReason);
+			CPrintToChat(i, "{green}[SM]{red} Please check your console if it's not a false flag.");
 			PrintStats(i, client);
 			PrintStreak(i, client, -1, true);
 
