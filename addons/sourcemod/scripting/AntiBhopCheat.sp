@@ -742,7 +742,7 @@ void Discord_Notify(int client, const char[] reason, const char[] stats)
 	Discord_SendMessage(sWebhook, sMessage);
 }
 
-bool Forward_OnDetected(int client, const char[] reason, const char[] stats)
+void Forward_OnDetected(int client, const char[] reason, const char[] stats)
 {
 	Call_StartForward(g_hOnClientDetected);
 	Call_PushCell(client);
