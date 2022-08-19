@@ -21,7 +21,7 @@
 #define VALID_MIN_JUMPS 3
 #define VALID_MAX_TICKS 5
 #define VALID_MIN_VELOCITY 250
-#define PLUGIN_VERSION "1.5.2"
+#define PLUGIN_VERSION "1.5.6"
 
 int g_aButtons[MAXPLAYERS + 1];
 bool g_bOnGround[MAXPLAYERS + 1];
@@ -35,6 +35,7 @@ EngineVersion gEV_Type = Engine_Unknown;
 ConVar g_cDetectionSound = null;
 ConVar g_cCountBots = null;
 ConVar g_cvKickBhopHack;
+ConVar g_cvSvGravity;
 
 // Api
 Handle g_hOnClientDetected;
@@ -65,6 +66,8 @@ public void OnPluginStart()
 
 	AutoExecConfig(true);
 
+	g_cvSvGravity = FindConVar("sv_gravity");
+
 	/* Handle late load */
 	for(int client = 1; client <= MaxClients; client++)
 	{
@@ -91,41 +94,44 @@ public void OnMapStart()
 	}
 	
 	if(GameConfGetKeyValue(hConfig, "SoundBeep", g_sBeepSound, PLATFORM_MAX_PATH))
-	{
 		PrecacheSound(g_sBeepSound, true);
-	}
 
 	delete hConfig;
 }
 
-
 public void OnClientPutInServer(int client)
 {
 	g_aPlayers[client] = new CPlayer(client);
+	ResetValues(client);
 }
 
 public void OnClientDisconnect(int client)
 {
+	ResetValues(client);
 	if(g_aPlayers[client])
 	{
 		g_aPlayers[client].Dispose();
 		g_aPlayers[client] = null;
 	}
-
-	g_bOnGround[client] = false;
-	g_bHoldingJump[client] = false;
-	g_bInJump[client] = false;
 }
 
 public Action OnPlayerRunCmd(int client, int &buttons)
 {
-	g_aButtons[client] = buttons;
+	if(!IsClientInGame(client))
+		return Plugin_Continue;
+
+	MoveType ClientMoveType = GetEntityMoveType(client);
+	
+	if(IsPlayerAlive(client) && ClientMoveType != MOVETYPE_LADDER || ClientMoveType != MOVETYPE_NOCLIP || ClientMoveType !=MOVETYPE_FLY || ClientMoveType !=MOVETYPE_FLYGRAVITY || g_cvSvGravity.IntValue != 800)
+	{
+		g_aButtons[client] = buttons;
+	}
 	return Plugin_Continue;
 }
 
 public void OnPlayerRunCmdPost(int client, int buttons, int impulse, const float vel[3], const float angles[3], int weapon, int subtype, int cmdnum, int tickcount, int seed, const int mouse[2])
 {
-	if(!IsPlayerAlive(client))
+	if(!IsClientInGame(client) || !IsPlayerAlive(client))
 		return;
 
 	CPlayer Player = g_aPlayers[client];
@@ -360,6 +366,7 @@ void DoStats(CPlayer Player, CStreak CurStreak, CJump hJump)
 				KickClient(client, "Turn off your hack!");
 				LogAction(-1, client, "[AntiBhopCheat] \"%L\" was kicked for using bhop hack streak.", client);
 			}
+			ResetValues(client);
 			return;
 		}
 
@@ -371,6 +378,7 @@ void DoStats(CPlayer Player, CStreak CurStreak, CJump hJump)
 			CPrintToChat(client, "{green}[SM]{default} Turn off your bhop macro/script or hyperscroll!");
 			CPrintToChat(client, "{green}[SM]{default} Your bhop has been {red}turned off{default} until the end of the map.");
 			LimitBhop(client, true);
+			ResetValues(client);
 			return;
 		}
 	}
@@ -388,6 +396,7 @@ void DoStats(CPlayer Player, CStreak CurStreak, CJump hJump)
 				KickClient(client, "Turn off your hack!");
 				LogAction(-1, client, "[AntiBhopCheat] \"%L\" was kicked for using global bhop hack.", client);
 			}
+			ResetValues(client);
 			return;
 		}
 
@@ -399,6 +408,7 @@ void DoStats(CPlayer Player, CStreak CurStreak, CJump hJump)
 			CPrintToChat(client, "{green}[SM]{default} Turn off your bhop macro/script or hyperscroll!");
 			CPrintToChat(client, "{green}[SM]{default} Your bhop has been {red}turned off{default} until the end of the map.");
 			LimitBhop(client, true);
+			ResetValues(client);
 			return;
 		}
 	}
@@ -736,7 +746,7 @@ void Discord_Notify(int client, const char[] reason, const char[] stats)
 	GetCurrentMap(currentMap, sizeof(currentMap));
 
 	char sMessage[4096];
-	Format(sMessage, sizeof(sMessage), "```%s \nCurrent map :%s \n%s \n%s \nV.%s \n\n%s```", sPlayer, currentMap, sTime, sCount, PLUGIN_VERSION, sStats);
+	Format(sMessage, sizeof(sMessage), "```%s \nCurrent map : %s \n%s \n%s \nV.%s \n\n%s```", sPlayer, currentMap, sTime, sCount, PLUGIN_VERSION, sStats);
 	ReplaceString(sMessage, sizeof(sMessage), "\\n", "\n");
 
 	Discord_SendMessage(sWebhook, sMessage);
@@ -773,4 +783,11 @@ stock int GetClientCountEx(bool countBots)
 		}
 	}
 	return countBots ? iFakeClients + iRealClients : iRealClients;
+}
+
+stock void ResetValues(int client)
+{
+	g_bOnGround[client] = false;
+	g_bHoldingJump[client] = false;
+	g_bInJump[client] = false;
 }
