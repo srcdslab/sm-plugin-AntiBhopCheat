@@ -21,7 +21,7 @@
 #define VALID_MIN_JUMPS 3
 #define VALID_MAX_TICKS 5
 #define VALID_MIN_VELOCITY 250
-#define PLUGIN_VERSION "1.5.6"
+#define PLUGIN_VERSION "1.5.7"
 
 int g_aButtons[MAXPLAYERS + 1];
 bool g_bOnGround[MAXPLAYERS + 1];
@@ -40,7 +40,7 @@ ConVar g_cvSvGravity;
 // Api
 Handle g_hOnClientDetected;
 
-char g_sStats[4096];
+char g_sStats[1993];
 char g_sBeepSound[PLATFORM_MAX_PATH];
 
 public Plugin myinfo =
@@ -723,21 +723,21 @@ void Discord_Notify(int client, const char[] reason, const char[] stats)
 	char sAuth[32];
 	GetClientAuthId(client, AuthId_Steam2, sAuth, sizeof(sAuth), true);
 
-	char sPlayer[4096];
+	char sPlayer[256];
 	#if defined _sourcebanschecker_included
 		Format(sPlayer, sizeof(sPlayer), "%N (%d bans - %d comms) [%s] has been detected for %s.", client, SBCheckerGetClientsBans(client), SBCheckerGetClientsComms(client), sAuth, reason);
 	#else
 		Format(sPlayer, sizeof(sPlayer), "%N [%s] has been detected for %s.", client, sAuth, reason);
 	#endif
 
-	char sStats[4096];
+	char sStats[1993];
 	Format(sStats, sizeof(sStats), "%s", stats);
 
 	char sTime[64];
 	int iTime = GetTime();
 	FormatTime(sTime, sizeof(sTime), "Date : %d/%m/%Y @ %H:%M:%S", iTime);
 
-	char sCount[64];
+	char sCount[32];
 	int iMaxPlayers = MaxClients;
 	int iConnected = GetClientCountEx(g_cCountBots.BoolValue);
 	Format(sCount, sizeof(sCount), "Players : %d/%d", iConnected, iMaxPlayers);
@@ -745,11 +745,26 @@ void Discord_Notify(int client, const char[] reason, const char[] stats)
 	char currentMap[PLATFORM_MAX_PATH];
 	GetCurrentMap(currentMap, sizeof(currentMap));
 
-	char sMessage[4096];
+	char sMessage[4096], sMessagePt1[4096], sMessagePt2[4096];
+
 	Format(sMessage, sizeof(sMessage), "```%s \nCurrent map : %s \n%s \n%s \nV.%s \n\n%s```", sPlayer, currentMap, sTime, sCount, PLUGIN_VERSION, sStats);
 	ReplaceString(sMessage, sizeof(sMessage), "\\n", "\n");
+	
+	if(strlen(sMessage) < 2000) // Discord character limit is 2000
+	{
+		Discord_SendMessage(sWebhook, sMessage);
+	}
+	else // If reach 2000 characters content will be truncated, so we split msgs..
+	{
+		Format(sMessagePt1, sizeof(sMessagePt1), "```%s \nCurrent map : %s \n%s \n%s \nV.%s```", sPlayer, currentMap, sTime, sCount, PLUGIN_VERSION);
+		ReplaceString(sMessagePt1, sizeof(sMessagePt1), "\\n", "\n");
 
-	Discord_SendMessage(sWebhook, sMessage);
+		Format(sMessagePt2, sizeof(sMessagePt2), "```%s```", sStats);
+		ReplaceString(sMessagePt2, sizeof(sMessagePt2), "\\n", "\n");
+
+		Discord_SendMessage(sWebhook, sMessagePt1);
+		Discord_SendMessage(sWebhook, sMessagePt2);
+	}
 }
 
 void Forward_OnDetected(int client, const char[] reason, const char[] stats)
