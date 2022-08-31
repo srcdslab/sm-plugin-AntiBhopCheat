@@ -749,6 +749,9 @@ void Discord_Notify(int client, const char[] reason, const char[] stats)
 
 	Format(sMessage, sizeof(sMessage), "```%s \nCurrent map : %s \n%s \n%s \nV.%s \n\n%s```", sPlayer, currentMap, sTime, sCount, PLUGIN_VERSION, sStats);
 	ReplaceString(sMessage, sizeof(sMessage), "\\n", "\n");
+
+	if(strlen(sMessage) >= 4000) // We cancel it. Too many characters.
+		return;
 	
 	if(strlen(sMessage) < 2000) // Discord character limit is 2000
 	{
