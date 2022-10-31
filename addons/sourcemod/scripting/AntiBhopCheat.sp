@@ -21,7 +21,6 @@
 #define VALID_MIN_JUMPS 3
 #define VALID_MAX_TICKS 5
 #define VALID_MIN_VELOCITY 250
-#define PLUGIN_VERSION "1.5.7"
 
 int g_aButtons[MAXPLAYERS + 1];
 bool g_bOnGround[MAXPLAYERS + 1];
@@ -48,10 +47,9 @@ public Plugin myinfo =
 	name			= "AntiBhopCheat",
 	author			= "BotoX, .Rushaway",
 	description		= "Detect all kinds of bhop cheats",
-	version			= PLUGIN_VERSION,
+	version			= "1.6.0",
 	url				= ""
 };
-
 
 public void OnPluginStart()
 {
@@ -725,7 +723,7 @@ void Discord_Notify(int client, const char[] reason, const char[] stats)
 
 	char sPlayer[256];
 	#if defined _sourcebanschecker_included
-		Format(sPlayer, sizeof(sPlayer), "%N (%d bans - %d comms) [%s] has been detected for %s.", client, SBCheckerGetClientsBans(client), SBCheckerGetClientsComms(client), sAuth, reason);
+		Format(sPlayer, sizeof(sPlayer), "%N (%d bans - %d comms) [%s] has been detected for %s.", client, SBPP_CheckerGetClientsBans(client), SBPP_CheckerGetClientsComms(client), sAuth, reason);
 	#else
 		Format(sPlayer, sizeof(sPlayer), "%N [%s] has been detected for %s.", client, sAuth, reason);
 	#endif
@@ -747,16 +745,19 @@ void Discord_Notify(int client, const char[] reason, const char[] stats)
 
 	char sMessage[4096], sMessagePt1[4096], sMessagePt2[4096];
 
-	Format(sMessage, sizeof(sMessage), "```%s \nCurrent map : %s \n%s \n%s \nV.%s \n\n%s```", sPlayer, currentMap, sTime, sCount, PLUGIN_VERSION, sStats);
+	char sPluginVersion[256];
+	GetPluginInfo(INVALID_HANDLE, PlInfo_Version, sPluginVersion, sizeof(sPluginVersion));
+
+	Format(sMessage, sizeof(sMessage), "```%s \nCurrent map : %s \n%s \n%s \nV.%s \n\n%s```", sPlayer, currentMap, sTime, sCount, sPluginVersion, sStats);
 	ReplaceString(sMessage, sizeof(sMessage), "\\n", "\n");
-	
+
 	if(strlen(sMessage) < 2000) // Discord character limit is 2000
 	{
 		Discord_SendMessage(sWebhook, sMessage);
 	}
 	else // If reach 2000 characters content will be truncated, so we split msgs..
 	{
-		Format(sMessagePt1, sizeof(sMessagePt1), "```%s \nCurrent map : %s \n%s \n%s \nV.%s```", sPlayer, currentMap, sTime, sCount, PLUGIN_VERSION);
+		Format(sMessagePt1, sizeof(sMessagePt1), "```%s \nCurrent map : %s \n%s \n%s \nV.%s```", sPlayer, currentMap, sTime, sCount, sPluginVersion);
 		ReplaceString(sMessagePt1, sizeof(sMessagePt1), "\\n", "\n");
 
 		Format(sMessagePt2, sizeof(sMessagePt2), "```%s```", sStats);
