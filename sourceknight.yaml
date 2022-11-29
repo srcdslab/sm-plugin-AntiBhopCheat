@@ -24,11 +24,11 @@ project:
       - source: /addons/sourcemod/scripting/include
         dest: /addons/sourcemod/scripting/include
 
-    - name: discord
+    - name: discordwebapi
       type: git
-      repo: https://github.com/srcdslab/sm-plugin-Discord
+      repo: https://github.com/srcdslab/sm-plugin-DiscordWebhookAPI
       unpack:
-      - source: /addons/sourcemod/scripting/include
+      - source: /include
         dest: /addons/sourcemod/scripting/include
 
     - name: sourcebans-pp

@@ -2,15 +2,11 @@
 #include <sdktools>
 #include <multicolors>
 #include <SelectiveBhop>
-#tryinclude <Discord>
-#tryinclude <sourcebanschecker>
+#include <discordWebhookAPI>
 
-#if !defined _Discord_Included
-	#warning "Discord.inc" include file not found, some features may not work!
-#endif
-#if !defined _sourcebanschecker_included
-	#warning "sourcebanschecker.inc" include file not found, some features may not work!
-#endif
+#undef REQUIRE_PLUGIN
+#tryinclude <sourcebanschecker>
+#define REQUIRE_PLUGIN
 
 #include <basic>
 #include <CJump>
@@ -36,6 +32,10 @@ ConVar g_cCountBots = null;
 ConVar g_cvKickBhopHack;
 ConVar g_cvSvGravity;
 
+ConVar g_cvWebhook;
+
+bool g_Plugin_SourceBans = false;
+
 // Api
 Handle g_hOnClientDetected;
 
@@ -47,7 +47,7 @@ public Plugin myinfo =
 	name			= "AntiBhopCheat",
 	author			= "BotoX, .Rushaway",
 	description		= "Detect all kinds of bhop cheats",
-	version			= "1.6.0",
+	version			= "1.7.0",
 	url				= ""
 };
 
@@ -58,6 +58,7 @@ public void OnPluginStart()
 	g_cDetectionSound = CreateConVar("sm_antibhopcheat_detection_sound", "1", "Emit a beep sound when someone gets flagged [0 = disabled, 1 = enabled]", 0, true, 0.0, true, 1.0);
 	g_cvKickBhopHack = CreateConVar("sm_antibhopcheat_kick_hack", "0", "Automaticly Kick if a player is flagged for HACK? [0 = disabled, 1 = enabled]", FCVAR_NOTIFY, true, 0.0, true, 1.0);
 	g_cCountBots = CreateConVar("sm_antibhopcheat_count_bots", "1", "Should we count bots as players ?[0 = No, 1 = Yes]", FCVAR_NOTIFY, true, 0.0, true, 1.0);
+	g_cvWebhook = CreateConVar("sm_antibhopcheat_webhook", "", "The webhook URL of your Discord channel.", FCVAR_PROTECTED);
 
 	RegAdminCmd("sm_stats", Command_Stats, ADMFLAG_GENERIC, "sm_stats <#userid|name>");
 	RegAdminCmd("sm_streak", Command_Streak, ADMFLAG_GENERIC, "sm_streak <#userid|name> [streak]");
@@ -78,6 +79,23 @@ public void OnPluginStart()
 
 	// Api
 	g_hOnClientDetected = CreateGlobalForward("AntiBhopCheat_OnClientDetected", ET_Ignore, Param_Cell, Param_String, Param_String);
+}
+
+public void OnAllPluginsLoaded()
+{
+	g_Plugin_SourceBans = LibraryExists("sourcebans++");
+}
+
+public void OnLibraryAdded(const char[] sName)
+{
+	if (strcmp(sName, "sourcebans++", false) == 0)
+		g_Plugin_SourceBans = true;
+}
+
+public void OnLibraryRemoved(const char[] sName)
+{
+	if (strcmp(sName, "sourcebans++", false) == 0)
+		g_Plugin_SourceBans = false;
 }
 
 public void OnMapStart()
@@ -715,18 +733,26 @@ void PrintStreak(int client, int iTarget, int iStreak, bool bDetected=false)
 
 void Discord_Notify(int client, const char[] reason, const char[] stats)
 {
-	char sWebhook[64];
-	Format(sWebhook, sizeof(sWebhook), "antibhopcheat");
-
 	char sAuth[32];
 	GetClientAuthId(client, AuthId_Steam2, sAuth, sizeof(sAuth), true);
 
 	char sPlayer[256];
+	if (g_Plugin_SourceBans)
+	{
+		int iClientBans = 0;
+		int iClientComms = 0;
+
 	#if defined _sourcebanschecker_included
-		Format(sPlayer, sizeof(sPlayer), "%N (%d bans - %d comms) [%s] has been detected for %s.", client, SBPP_CheckerGetClientsBans(client), SBPP_CheckerGetClientsComms(client), sAuth, reason);
-	#else
-		Format(sPlayer, sizeof(sPlayer), "%N [%s] has been detected for %s.", client, sAuth, reason);
+		iClientBans = SBPP_CheckerGetClientsBans(client);
+		iClientComms = SBPP_CheckerGetClientsComms(client);
 	#endif
+
+		Format(sPlayer, sizeof(sPlayer), "%N (%d bans - %d comms) [%s] has been detected for %s.", client, iClientBans, iClientComms, sAuth, reason);
+	}
+	else
+	{
+		Format(sPlayer, sizeof(sPlayer), "%N [%s] has been detected for %s.", client, sAuth, reason);		
+	}
 
 	char sStats[1993];
 	Format(sStats, sizeof(sStats), "%s", stats);
@@ -751,9 +777,14 @@ void Discord_Notify(int client, const char[] reason, const char[] stats)
 	Format(sMessage, sizeof(sMessage), "```%s \nCurrent map : %s \n%s \n%s \nV.%s \n\n%s```", sPlayer, currentMap, sTime, sCount, sPluginVersion, sStats);
 	ReplaceString(sMessage, sizeof(sMessage), "\\n", "\n");
 
+	char szWebhookURL[1000];
+	g_cvWebhook.GetString(szWebhookURL, sizeof szWebhookURL);
+
 	if(strlen(sMessage) < 2000) // Discord character limit is 2000
 	{
-		Discord_SendMessage(sWebhook, sMessage);
+		Webhook webhook = new Webhook(sMessage);
+		webhook.Execute(szWebhookURL, OnWebHookExecuted);
+		delete webhook;
 	}
 	else // If reach 2000 characters content will be truncated, so we split msgs..
 	{
@@ -763,9 +794,22 @@ void Discord_Notify(int client, const char[] reason, const char[] stats)
 		Format(sMessagePt2, sizeof(sMessagePt2), "```%s```", sStats);
 		ReplaceString(sMessagePt2, sizeof(sMessagePt2), "\\n", "\n");
 
-		Discord_SendMessage(sWebhook, sMessagePt1);
-		Discord_SendMessage(sWebhook, sMessagePt2);
+		Webhook webhook = new Webhook(sMessagePt1);
+		webhook.Execute(szWebhookURL, OnWebHookExecuted);
+		delete webhook;
+
+		Webhook webhook2 = new Webhook(sMessagePt2);
+		webhook2.Execute(szWebhookURL, OnWebHookExecuted);
+		delete webhook2;
 	}
+}
+
+public void OnWebHookExecuted(HTTPResponse response, DataPack pack)
+{
+    if (response.Status != HTTPStatus_OK)
+    {
+        LogError("Failed to send antibhopcheat webhook");
+    }
 }
 
 void Forward_OnDetected(int client, const char[] reason, const char[] stats)
@@ -776,9 +820,7 @@ void Forward_OnDetected(int client, const char[] reason, const char[] stats)
 	Call_PushString(stats);
 	Call_Finish();
 
-#if defined _Discord_Included
 	Discord_Notify(client, reason, stats);
-#endif
 
 	g_sStats = "";
 }
