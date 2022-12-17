@@ -108,7 +108,7 @@ methodmap CJump < Basic
 
 	public void Dispose(bool disposemembers=true)
 	{
-		if(disposemembers)
+		if (disposemembers)
 		{
 			delete this.hPresses;
 		}

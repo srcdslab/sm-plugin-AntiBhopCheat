@@ -133,7 +133,7 @@ methodmap CPlayer < Basic
 
 			delete hStreaks;
 
-			if(this.hStreak != hStreak)
+			if (this.hStreak != hStreak)
 				this.hStreak.Dispose();
 		}
 

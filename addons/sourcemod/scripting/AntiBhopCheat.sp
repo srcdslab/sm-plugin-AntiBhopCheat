@@ -24,7 +24,7 @@ bool g_bHoldingJump[MAXPLAYERS + 1];
 bool g_bInJump[MAXPLAYERS + 1];
 bool g_bNoSound = false;
 
-CPlayer g_aPlayers[MAXPLAYERS + 1];
+CPlayer g_aPlayers[MAXPLAYERS + 1] = { null, ... };
 EngineVersion gEV_Type = Engine_Unknown;
 
 ConVar g_cDetectionSound = null;
@@ -42,14 +42,22 @@ Handle g_hOnClientDetected;
 char g_sStats[1993];
 char g_sBeepSound[PLATFORM_MAX_PATH];
 
+bool g_bLate = false;
+
 public Plugin myinfo =
 {
 	name			= "AntiBhopCheat",
 	author			= "BotoX, .Rushaway",
 	description		= "Detect all kinds of bhop cheats",
-	version			= "1.7.0",
+	version			= "1.7.1",
 	url				= ""
 };
+
+public APLRes AskPluginLoad2(Handle myself, bool late, char[] error, int err_max)
+{
+	g_bLate = late;
+	return APLRes_Success;
+}
 
 public void OnPluginStart()
 {
@@ -67,18 +75,19 @@ public void OnPluginStart()
 
 	g_cvSvGravity = FindConVar("sv_gravity");
 
-	/* Handle late load */
-	for(int client = 1; client <= MaxClients; client++)
+	g_hOnClientDetected = CreateGlobalForward("AntiBhopCheat_OnClientDetected", ET_Ignore, Param_Cell, Param_String, Param_String);
+
+	if (g_bLate)
 	{
-		if(IsClientConnected(client))
+		for (int client = 1; client <= MaxClients; client++)
 		{
-			if(IsClientInGame(client))
-				OnClientPutInServer(client);
+			if (IsClientConnected(client))
+			{
+				if (IsClientInGame(client))
+					OnClientPutInServer(client);
+			}
 		}
 	}
-
-	// Api
-	g_hOnClientDetected = CreateGlobalForward("AntiBhopCheat_OnClientDetected", ET_Ignore, Param_Cell, Param_String, Param_String);
 }
 
 public void OnAllPluginsLoaded()
@@ -108,7 +117,7 @@ public void OnMapStart()
 
 		return;
 	}
-	
+
 	if(GameConfGetKeyValue(hConfig, "SoundBeep", g_sBeepSound, PLATFORM_MAX_PATH))
 		PrecacheSound(g_sBeepSound, true);
 
@@ -124,7 +133,7 @@ public void OnClientPutInServer(int client)
 public void OnClientDisconnect(int client)
 {
 	ResetValues(client);
-	if(g_aPlayers[client])
+	if (g_aPlayers[client] != null)
 	{
 		g_aPlayers[client].Dispose();
 		g_aPlayers[client] = null;
@@ -133,12 +142,12 @@ public void OnClientDisconnect(int client)
 
 public Action OnPlayerRunCmd(int client, int &buttons)
 {
-	if(!IsClientInGame(client))
+	if (!IsClientInGame(client))
 		return Plugin_Continue;
 
 	MoveType ClientMoveType = GetEntityMoveType(client);
 	
-	if(IsPlayerAlive(client) && ClientMoveType != MOVETYPE_LADDER || ClientMoveType != MOVETYPE_NOCLIP || ClientMoveType !=MOVETYPE_FLY || ClientMoveType !=MOVETYPE_FLYGRAVITY || g_cvSvGravity.IntValue != 800)
+	if (IsPlayerAlive(client) && ClientMoveType != MOVETYPE_LADDER || ClientMoveType != MOVETYPE_NOCLIP || ClientMoveType != MOVETYPE_FLY || ClientMoveType != MOVETYPE_FLYGRAVITY || g_cvSvGravity.IntValue != 800)
 	{
 		g_aButtons[client] = buttons;
 	}
@@ -147,7 +156,7 @@ public Action OnPlayerRunCmd(int client, int &buttons)
 
 public void OnPlayerRunCmdPost(int client, int buttons, int impulse, const float vel[3], const float angles[3], int weapon, int subtype, int cmdnum, int tickcount, int seed, const int mouse[2])
 {
-	if(!IsClientInGame(client) || !IsPlayerAlive(client))
+	if (!IsClientInGame(client) || !IsPlayerAlive(client))
 		return;
 
 	CPlayer Player = g_aPlayers[client];
@@ -168,16 +177,16 @@ public void OnPlayerRunCmdPost(int client, int buttons, int impulse, const float
 	fVecVelocity[2] = 0.0;
 	float fVelocity = GetVectorLength(fVecVelocity);
 
-	if(bInJump && (bInWater || ClientMoveType == MOVETYPE_LADDER || ClientMoveType == MOVETYPE_NOCLIP))
+	if (bInJump && (bInWater || ClientMoveType == MOVETYPE_LADDER || ClientMoveType == MOVETYPE_NOCLIP))
 		bOnGround = true;
 
-	if(bOnGround)
+	if (bOnGround)
 	{
-		if(!bPrevOnGround)
+		if (!bPrevOnGround)
 		{
 			g_bOnGround[client] = true;
 			g_bInJump[client] = false;
-			if(bInJump)
+			if (bInJump)
 				OnTouchGround(Player, tickcount, fVelocity);
 		}
 	}
@@ -187,9 +196,9 @@ public void OnPlayerRunCmdPost(int client, int buttons, int impulse, const float
 			g_bOnGround[client] = false;
 	}
 
-	if(bHoldingJump)
+	if (bHoldingJump)
 	{
-		if(!bPrevHoldingJump && !bOnGround && (bPrevOnGround || bInJump))
+		if (!bPrevHoldingJump && !bOnGround && (bPrevOnGround || bInJump))
 		{
 			g_bHoldingJump[client] = true;
 			g_bInJump[client] = true;
@@ -198,7 +207,7 @@ public void OnPlayerRunCmdPost(int client, int buttons, int impulse, const float
 	}
 	else
 	{
-		if(bPrevHoldingJump)
+		if (bPrevHoldingJump)
 		{
 			g_bHoldingJump[client] = false;
 			OnReleaseJump(Player, tickcount, fVelocity);
@@ -220,13 +229,13 @@ void OnTouchGround(CPlayer Player, int iTick, float fVelocity)
 	hJump.fEndVel = fVelocity;
 
 	int iLength = hJumps.Length;
-	if(iLength == VALID_MIN_JUMPS)
+	if (iLength == VALID_MIN_JUMPS)
 	{
 		CurStreak.bValid = true;
 
 		// Current streak is valid, push onto hStreaks ArrayList
 		ArrayList hStreaks = Player.hStreaks;
-		if(hStreaks.Length == MAX_STREAKS)
+		if (hStreaks.Length == MAX_STREAKS)
 		{
 			// Keep the last 10 streaks
 			CStreak hStreak = hStreaks.Get(0);
@@ -235,13 +244,13 @@ void OnTouchGround(CPlayer Player, int iTick, float fVelocity)
 		}
 		hStreaks.Push(CurStreak);
 
-		for(int i = 0; i < iLength - 1; i++)
+		for (int i = 0; i < iLength - 1; i++)
 		{
 			CJump hJump_ = hJumps.Get(i);
 			DoStats(Player, CurStreak, hJump_);
 		}
 	}
-	else if(iLength > VALID_MIN_JUMPS)
+	else if (iLength > VALID_MIN_JUMPS)
 	{
 		CJump hJump_ = hJumps.Get(hJumps.Length - 2);
 		DoStats(Player, CurStreak, hJump_);
