@@ -24,7 +24,7 @@ bool g_bHoldingJump[MAXPLAYERS + 1];
 bool g_bInJump[MAXPLAYERS + 1];
 bool g_bNoSound = false;
 
-CPlayer g_aPlayers[MAXPLAYERS + 1];
+CPlayer g_aPlayers[MAXPLAYERS + 1] = { null, ... };
 EngineVersion gEV_Type = Engine_Unknown;
 
 ConVar g_cDetectionSound = null;
@@ -42,14 +42,22 @@ Handle g_hOnClientDetected;
 char g_sStats[1993];
 char g_sBeepSound[PLATFORM_MAX_PATH];
 
+bool g_bLate = false;
+
 public Plugin myinfo =
 {
 	name			= "AntiBhopCheat",
 	author			= "BotoX, .Rushaway",
 	description		= "Detect all kinds of bhop cheats",
-	version			= "1.7.0",
+	version			= "1.7.2",
 	url				= ""
 };
+
+public APLRes AskPluginLoad2(Handle myself, bool late, char[] error, int err_max)
+{
+	g_bLate = late;
+	return APLRes_Success;
+}
 
 public void OnPluginStart()
 {
@@ -67,18 +75,19 @@ public void OnPluginStart()
 
 	g_cvSvGravity = FindConVar("sv_gravity");
 
-	/* Handle late load */
-	for(int client = 1; client <= MaxClients; client++)
+	g_hOnClientDetected = CreateGlobalForward("AntiBhopCheat_OnClientDetected", ET_Ignore, Param_Cell, Param_String, Param_String);
+
+	if (g_bLate)
 	{
-		if(IsClientConnected(client))
+		for (int client = 1; client <= MaxClients; client++)
 		{
-			if(IsClientInGame(client))
-				OnClientPutInServer(client);
+			if (IsClientConnected(client))
+			{
+				if (IsClientInGame(client))
+					OnClientPutInServer(client);
+			}
 		}
 	}
-
-	// Api
-	g_hOnClientDetected = CreateGlobalForward("AntiBhopCheat_OnClientDetected", ET_Ignore, Param_Cell, Param_String, Param_String);
 }
 
 public void OnAllPluginsLoaded()
@@ -102,14 +111,14 @@ public void OnMapStart()
 {
 	Handle hConfig = LoadGameConfigFile("funcommands.games");
 
-	if(hConfig == null)
+	if (hConfig == null)
 	{
 		SetFailState("Unable to load game config funcommands.games");
 
 		return;
 	}
-	
-	if(GameConfGetKeyValue(hConfig, "SoundBeep", g_sBeepSound, PLATFORM_MAX_PATH))
+
+	if (GameConfGetKeyValue(hConfig, "SoundBeep", g_sBeepSound, PLATFORM_MAX_PATH))
 		PrecacheSound(g_sBeepSound, true);
 
 	delete hConfig;
@@ -124,7 +133,7 @@ public void OnClientPutInServer(int client)
 public void OnClientDisconnect(int client)
 {
 	ResetValues(client);
-	if(g_aPlayers[client])
+	if (g_aPlayers[client] != null)
 	{
 		g_aPlayers[client].Dispose();
 		g_aPlayers[client] = null;
@@ -133,12 +142,12 @@ public void OnClientDisconnect(int client)
 
 public Action OnPlayerRunCmd(int client, int &buttons)
 {
-	if(!IsClientInGame(client))
+	if (!IsClientInGame(client))
 		return Plugin_Continue;
 
 	MoveType ClientMoveType = GetEntityMoveType(client);
 	
-	if(IsPlayerAlive(client) && ClientMoveType != MOVETYPE_LADDER || ClientMoveType != MOVETYPE_NOCLIP || ClientMoveType !=MOVETYPE_FLY || ClientMoveType !=MOVETYPE_FLYGRAVITY || g_cvSvGravity.IntValue != 800)
+	if (IsPlayerAlive(client) && ClientMoveType != MOVETYPE_LADDER || ClientMoveType != MOVETYPE_NOCLIP || ClientMoveType != MOVETYPE_FLY || ClientMoveType != MOVETYPE_FLYGRAVITY || g_cvSvGravity.IntValue != 800)
 	{
 		g_aButtons[client] = buttons;
 	}
@@ -147,7 +156,7 @@ public Action OnPlayerRunCmd(int client, int &buttons)
 
 public void OnPlayerRunCmdPost(int client, int buttons, int impulse, const float vel[3], const float angles[3], int weapon, int subtype, int cmdnum, int tickcount, int seed, const int mouse[2])
 {
-	if(!IsClientInGame(client) || !IsPlayerAlive(client))
+	if (!IsClientInGame(client) || !IsPlayerAlive(client))
 		return;
 
 	CPlayer Player = g_aPlayers[client];
@@ -168,28 +177,28 @@ public void OnPlayerRunCmdPost(int client, int buttons, int impulse, const float
 	fVecVelocity[2] = 0.0;
 	float fVelocity = GetVectorLength(fVecVelocity);
 
-	if(bInJump && (bInWater || ClientMoveType == MOVETYPE_LADDER || ClientMoveType == MOVETYPE_NOCLIP))
+	if (bInJump && (bInWater || ClientMoveType == MOVETYPE_LADDER || ClientMoveType == MOVETYPE_NOCLIP))
 		bOnGround = true;
 
-	if(bOnGround)
+	if (bOnGround)
 	{
-		if(!bPrevOnGround)
+		if (!bPrevOnGround)
 		{
 			g_bOnGround[client] = true;
 			g_bInJump[client] = false;
-			if(bInJump)
+			if (bInJump)
 				OnTouchGround(Player, tickcount, fVelocity);
 		}
 	}
 	else
 	{
-		if(bPrevOnGround)
+		if (bPrevOnGround)
 			g_bOnGround[client] = false;
 	}
 
-	if(bHoldingJump)
+	if (bHoldingJump)
 	{
-		if(!bPrevHoldingJump && !bOnGround && (bPrevOnGround || bInJump))
+		if (!bPrevHoldingJump && !bOnGround && (bPrevOnGround || bInJump))
 		{
 			g_bHoldingJump[client] = true;
 			g_bInJump[client] = true;
@@ -198,7 +207,7 @@ public void OnPlayerRunCmdPost(int client, int buttons, int impulse, const float
 	}
 	else
 	{
-		if(bPrevHoldingJump)
+		if (bPrevHoldingJump)
 		{
 			g_bHoldingJump[client] = false;
 			OnReleaseJump(Player, tickcount, fVelocity);
@@ -220,13 +229,13 @@ void OnTouchGround(CPlayer Player, int iTick, float fVelocity)
 	hJump.fEndVel = fVelocity;
 
 	int iLength = hJumps.Length;
-	if(iLength == VALID_MIN_JUMPS)
+	if (iLength == VALID_MIN_JUMPS)
 	{
 		CurStreak.bValid = true;
 
 		// Current streak is valid, push onto hStreaks ArrayList
 		ArrayList hStreaks = Player.hStreaks;
-		if(hStreaks.Length == MAX_STREAKS)
+		if (hStreaks.Length == MAX_STREAKS)
 		{
 			// Keep the last 10 streaks
 			CStreak hStreak = hStreaks.Get(0);
@@ -235,13 +244,13 @@ void OnTouchGround(CPlayer Player, int iTick, float fVelocity)
 		}
 		hStreaks.Push(CurStreak);
 
-		for(int i = 0; i < iLength - 1; i++)
+		for (int i = 0; i < iLength - 1; i++)
 		{
 			CJump hJump_ = hJumps.Get(i);
 			DoStats(Player, CurStreak, hJump_);
 		}
 	}
-	else if(iLength > VALID_MIN_JUMPS)
+	else if (iLength > VALID_MIN_JUMPS)
 	{
 		CJump hJump_ = hJumps.Get(hJumps.Length - 2);
 		DoStats(Player, CurStreak, hJump_);
@@ -256,17 +265,17 @@ void OnPressJump(CPlayer Player, int iTick, float fVelocity, bool bLeaveGround)
 	ArrayList hJumps = CurStreak.hJumps;
 	CJump hJump;
 
-	if(bLeaveGround)
+	if (bLeaveGround)
 	{
 		int iPrevJump = -1;
 		// Check if we should start a new streak
-		if(hJumps.Length)
+		if (hJumps.Length)
 		{
 			// Last jump was more than VALID_MAX_TICKS ticks ago or not valid and fVelocity < VALID_MIN_VELOCITY
 			hJump = hJumps.Get(hJumps.Length - 1);
-			if(hJump.iEndTick < iTick - VALID_MAX_TICKS || fVelocity < VALID_MIN_VELOCITY)
+			if (hJump.iEndTick < iTick - VALID_MAX_TICKS || fVelocity < VALID_MIN_VELOCITY)
 			{
-				if(CurStreak.bValid)
+				if ( CurStreak.bValid)
 				{
 					CurStreak.iEndTick = iTick;
 
@@ -289,7 +298,7 @@ void OnPressJump(CPlayer Player, int iTick, float fVelocity, bool bLeaveGround)
 		hJump = new CJump();
 		hJump.iStartTick = iTick;
 		hJump.fStartVel = fVelocity;
-		if(iPrevJump != -1)
+		if (iPrevJump != -1)
 			hJump.iPrevJump = iPrevJump;
 		hJumps.Push(hJump);
 	}
@@ -329,10 +338,10 @@ void DoStats(CPlayer Player, CStreak CurStreak, CJump hJump)
 	int iPrevJump = hJump.iPrevJump;
 	int iNextJump = hJump.iNextJump;
 
-	if(iPrevJump > 0)
+	if (iPrevJump > 0)
 	{
 		int iPerf = iPrevJump - 1;
-		if(iPerf > 2)
+		if (iPerf > 2)
 			iPerf = 2;
 
 		aJumps[iPerf]++;
@@ -343,13 +352,13 @@ void DoStats(CPlayer Player, CStreak CurStreak, CJump hJump)
 	iLastJunk = iEndTick - hPresses.Get(iPresses - 1, 1);
 
 	float PressesPerTick = (iPresses * 4.0) / float(iTicks);
-	if(PressesPerTick >= 0.85)
+	if (PressesPerTick >= 0.85)
 	{
 		CurStreak.iHyperJumps++;
 		Player.iHyperJumps++;
 	}
 
-	if(iNextJump != -1 && iNextJump <= 1 && (iLastJunk > 5 || iPresses <= 2) && hJump.fEndVel >= 285.0)
+	if (iNextJump != -1 && iNextJump <= 1 && (iLastJunk > 5 || iPresses <= 2) && hJump.fEndVel >= 285.0)
 	{
 		CurStreak.iHackJumps++;
 		Player.iHackJumps++;
@@ -370,14 +379,14 @@ void DoStats(CPlayer Player, CStreak CurStreak, CJump hJump)
 	CurStreak.SetJumps(aStreakJumps);
 
 	int iStreakJumps = CurStreak.iJumps;
-	if(iStreakJumps >= 6)
+	if (iStreakJumps >= 6)
 	{
 		float HackRatio = CurStreak.iHackJumps / float(iStreakJumps);
-		if(HackRatio >= 0.85 && !Player.bFlagged)
+		if (HackRatio >= 0.85 && !Player.bFlagged)
 		{
 			Player.bFlagged = true;
 			NotifyAdmins(client, "bhop hack streak");
-			if(g_cvKickBhopHack.IntValue == 1)
+			if (g_cvKickBhopHack.IntValue == 1)
 			{
 				KickClient(client, "Turn off your hack!");
 				LogAction(-1, client, "[AntiBhopCheat] \"%L\" was kicked for using bhop hack streak.", client);
@@ -387,7 +396,7 @@ void DoStats(CPlayer Player, CStreak CurStreak, CJump hJump)
 		}
 
 		float HyperRatio = CurStreak.iHyperJumps / float(iStreakJumps);
-		if(HyperRatio >= 0.85 && !Player.bFlagged)
+		if (HyperRatio >= 0.85 && !Player.bFlagged)
 		{
 			Player.bFlagged = true;
 			NotifyAdmins(client, "hyperscroll streak");
@@ -400,14 +409,14 @@ void DoStats(CPlayer Player, CStreak CurStreak, CJump hJump)
 	}
 
 	int iGlobalJumps = Player.iJumps;
-	if(iGlobalJumps >= 25)
+	if (iGlobalJumps >= 25)
 	{
 		float HackRatio = Player.iHackJumps / float(iGlobalJumps);
-		if(HackRatio >= 0.65 && !Player.bFlagged)
+		if (HackRatio >= 0.65 && !Player.bFlagged)
 		{
 			Player.bFlagged = true;
 			NotifyAdmins(client, "global bhop hack");
-			if(g_cvKickBhopHack.IntValue == 1)
+			if (g_cvKickBhopHack.IntValue == 1)
 			{
 				KickClient(client, "Turn off your hack!");
 				LogAction(-1, client, "[AntiBhopCheat] \"%L\" was kicked for using global bhop hack.", client);
@@ -417,7 +426,7 @@ void DoStats(CPlayer Player, CStreak CurStreak, CJump hJump)
 		}
 
 		float HyperRatio = Player.iHyperJumps / float(iGlobalJumps);
-		if(HyperRatio >= 0.50 && !Player.bFlagged)
+		if (HyperRatio >= 0.50 && !Player.bFlagged)
 		{
 			Player.bFlagged = true;
 			NotifyAdmins(client, "hyperscroll global");
@@ -432,18 +441,18 @@ void DoStats(CPlayer Player, CStreak CurStreak, CJump hJump)
 
 void NotifyAdmins(int client, const char[] sReason)
 {
-	for(int i = 1; i <= MaxClients; i++)
+	for (int i = 1; i <= MaxClients; i++)
 	{
-		if(IsClientInGame(i) && !IsFakeClient(i) && CheckCommandAccess(i, "sm_stats", ADMFLAG_GENERIC))
+		if (IsClientInGame(i) && !IsFakeClient(i) && CheckCommandAccess(i, "sm_stats", ADMFLAG_GENERIC))
 		{
 			CPrintToChat(i, "{green}[SM]{red} %N {default}has been detected for {red}%s{default}", client, sReason);
 			CPrintToChat(i, "{green}[SM]{red} Please check your console if it's not a false flag.");
 			PrintStats(i, client);
 			PrintStreak(i, client, -1, true);
 
-			if(!g_bNoSound && g_cDetectionSound.BoolValue)
+			if (!g_bNoSound && g_cDetectionSound.BoolValue)
 			{
-				if(gEV_Type == Engine_CSS || gEV_Type == Engine_TF2)
+				if (gEV_Type == Engine_CSS || gEV_Type == Engine_TF2)
 					EmitSoundToClient(i, g_sBeepSound);
 				else
 					ClientCommand(i, "play */%s", g_sBeepSound);
@@ -457,7 +466,7 @@ void NotifyAdmins(int client, const char[] sReason)
 
 public Action Command_Stats(int client, int argc)
 {
-	if(argc < 1 || argc > 2)
+	if (argc < 1 || argc > 2)
 	{
 		CReplyToCommand(client, "{green}[SM] {default}Usage: sm_stats <#userid|name>");
 		return Plugin_Handled;
@@ -471,13 +480,13 @@ public Action Command_Stats(int client, int argc)
 
 	GetCmdArg(1, sArg, sizeof(sArg));
 
-	if((iTargetCount = ProcessTargetString(sArg, client, iTargets, MAXPLAYERS, COMMAND_FILTER_NO_MULTI | COMMAND_FILTER_NO_IMMUNITY, sTargetName, sizeof(sTargetName), bIsML)) <= 0)
+	if ((iTargetCount = ProcessTargetString(sArg, client, iTargets, MAXPLAYERS, COMMAND_FILTER_NO_MULTI | COMMAND_FILTER_NO_IMMUNITY, sTargetName, sizeof(sTargetName), bIsML)) <= 0)
 	{
 		ReplyToTargetError(client, iTargetCount);
 		return Plugin_Handled;
 	}
 
-	for(int i = 0; i < iTargetCount; i++)
+	for (int i = 0; i < iTargetCount; i++)
 	{
 		PrintStats(client, iTargets[i]);
 	}
@@ -495,9 +504,9 @@ void PrintStats(int client, int iTarget)
 	int iStreaks = hStreaks.Length;
 
 	// Try showing latest valid streak
-	if(!hStreak.bValid)
+	if (!hStreak.bValid)
 	{
-		if(iStreaks)
+		if (iStreaks)
 			hStreak = hStreaks.Get(iStreaks - 1);
 	}
 
@@ -523,7 +532,7 @@ void PrintStats(int client, int iTarget)
 
 public Action Command_Streak(int client, int argc)
 {
-	if(argc < 1 || argc > 2)
+	if (argc < 1 || argc > 2)
 	{
 		CReplyToCommand(client, "{green}[SM] {default}Usage: sm_streak <#userid|name> [streak]");
 		return Plugin_Handled;
@@ -539,19 +548,19 @@ public Action Command_Streak(int client, int argc)
 
 	GetCmdArg(1, sArg, sizeof(sArg));
 
-	if(argc == 2)
+	if (argc == 2)
 	{
 		GetCmdArg(2, sArg2, sizeof(sArg2));
 		iStreak = StringToInt(sArg2);
 	}
 
-	if((iTargetCount = ProcessTargetString(sArg, client, iTargets, MAXPLAYERS, COMMAND_FILTER_NO_MULTI | COMMAND_FILTER_NO_IMMUNITY, sTargetName, sizeof(sTargetName), bIsML)) <= 0)
+	if ((iTargetCount = ProcessTargetString(sArg, client, iTargets, MAXPLAYERS, COMMAND_FILTER_NO_MULTI | COMMAND_FILTER_NO_IMMUNITY, sTargetName, sizeof(sTargetName), bIsML)) <= 0)
 	{
 		ReplyToTargetError(client, iTargetCount);
 		return Plugin_Handled;
 	}
 
-	for(int i = 0; i < iTargetCount; i++)
+	for (int i = 0; i < iTargetCount; i++)
 	{
 		PrintStreak(client, iTargets[i], iStreak);
 	}
@@ -575,21 +584,21 @@ void PrintStreak(int client, int iTarget, int iStreak, bool bDetected=false)
 	int iStreaks = hStreaks.Length;
 
 	// Try showing latest valid streak
-	if(iStreak <= 0 && !hStreak.bValid)
+	if (iStreak <= 0 && !hStreak.bValid)
 	{
-		if(iStreaks)
+		if (iStreaks)
 			hStreak = hStreaks.Get(iStreaks - 1);
 	}
-	else if(iStreak > 0)
+	else if (iStreak > 0)
 	{
-		if(iStreak > MAX_STREAKS)
+		if (iStreak > MAX_STREAKS)
 		{
 			CReplyToCommand(client, "{green}[SM] {default}Streak is out of bounds (max. %d)!", MAX_STREAKS);
 			return;
 		}
 
 		int iIndex = iStreaks - iStreak;
-		if(iIndex < 0)
+		if (iIndex < 0)
 		{
 			CReplyToCommand(client, "{green}[SM] {default}Only {olive}%d {default}streaks are available for this player right now!", iStreaks);
 			return;
@@ -635,7 +644,7 @@ void PrintStreak(int client, int iTarget, int iStreak, bool bDetected=false)
 	float fPrevVel = 0.0;
 	int iPrevEndTick = -1;
 
-	for(int i = 0; i < hJumps.Length; i++)
+	for (int i = 0; i < hJumps.Length; i++)
 	{
 		CJump hJump = hJumps.Get(i);
 		ArrayList hPresses = hJump.hPresses;
@@ -649,10 +658,10 @@ void PrintStreak(int client, int iTarget, int iStreak, bool bDetected=false)
 		int iPrevTick = -1;
 		int iTicks;
 
-		if(iPrevEndTick != -1)
+		if (iPrevEndTick != -1)
 		{
 			iTicks = hJump.iStartTick - iPrevEndTick;
-			for(int k = 0; k < iTicks && k < 16; k++)
+			for (int k = 0; k < iTicks && k < 16; k++)
 				sPattern[iPatternLen++] = '|';
 		}
 
@@ -660,15 +669,15 @@ void PrintStreak(int client, int iTarget, int iStreak, bool bDetected=false)
 		float fAvgDownUp = 0.0;
 
 		int iPresses = hPresses.Length;
-		for(int j = 0; j < iPresses; j++)
+		for (int j = 0; j < iPresses; j++)
 		{
 			int aJunkJump[2];
 			hPresses.GetArray(j, aJunkJump);
 
-			if(iPrevTick != -1)
+			if (iPrevTick != -1)
 			{
 				iTicks = aJunkJump[0] - iPrevTick;
-				for(int k = 0; k < iTicks && k < 16; k++)
+				for (int k = 0; k < iTicks && k < 16; k++)
 					sPattern[iPatternLen++] = '.';
 
 				fAvgDist += iTicks;
@@ -677,7 +686,7 @@ void PrintStreak(int client, int iTarget, int iStreak, bool bDetected=false)
 			sPattern[iPatternLen++] = '^';
 
 			iTicks = aJunkJump[1] - aJunkJump[0];
-			for(int k = 0; k < iTicks && k < 16; k++)
+			for (int k = 0; k < iTicks && k < 16; k++)
 				sPattern[iPatternLen++] = ',';
 
 			fAvgDownUp += iTicks;
@@ -691,13 +700,13 @@ void PrintStreak(int client, int iTarget, int iStreak, bool bDetected=false)
 		fAvgDownUp /= iPresses;
 
 		iTicks = iEndTick - iPrevTick;
-		for(int k = 0; k < iTicks && k < 16; k++)
+		for (int k = 0; k < iTicks && k < 16; k++)
 			sPattern[iPatternLen++] = '.';
 
 		sPattern[iPatternLen++] = '|';
 		sPattern[iPatternLen++] = '\0';
 
-		if(fPrevVel == 0.0)
+		if (fPrevVel == 0.0)
 			fPrevVel = fInVel;
 
 		PrintToConsole(client, "#%2d %4d%% %7.1f %7.1f %4d%% %4d%% %8.2f %4d %6.2f   %s",
@@ -780,7 +789,7 @@ void Discord_Notify(int client, const char[] reason, const char[] stats)
 	char szWebhookURL[1000];
 	g_cvWebhook.GetString(szWebhookURL, sizeof szWebhookURL);
 
-	if(strlen(sMessage) < 2000) // Discord character limit is 2000
+	if (strlen(sMessage) < 2000) // Discord character limit is 2000
 	{
 		Webhook webhook = new Webhook(sMessage);
 		webhook.Execute(szWebhookURL, OnWebHookExecuted);
@@ -830,11 +839,11 @@ stock int GetClientCountEx(bool countBots)
 	int iRealClients = 0;
 	int iFakeClients = 0;
 
-	for(int player = 1; player <= MaxClients; player++)
+	for (int player = 1; player <= MaxClients; player++)
 	{
-		if(IsClientConnected(player))
+		if (IsClientConnected(player))
 		{
-			if(IsFakeClient(player))
+			if (IsFakeClient(player))
 				iFakeClients++;
 			else
 				iRealClients++;
