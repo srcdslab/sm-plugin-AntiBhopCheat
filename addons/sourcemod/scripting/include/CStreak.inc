@@ -145,7 +145,7 @@ methodmap CStreak < Basic
 
 	public void Dispose(bool disposemembers=true)
 	{
-		if(disposemembers)
+		if (disposemembers)
 		{
 			ArrayList hJumps = this.hJumps;
 

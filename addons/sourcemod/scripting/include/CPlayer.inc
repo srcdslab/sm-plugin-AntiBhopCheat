@@ -120,7 +120,7 @@ methodmap CPlayer < Basic
 
 	public void Dispose(bool disposemembers=true)
 	{
-		if(disposemembers)
+		if (disposemembers)
 		{
 			ArrayList hStreaks = this.hStreaks;
 
@@ -133,7 +133,7 @@ methodmap CPlayer < Basic
 
 			delete hStreaks;
 
-			if(this.hStreak != hStreak)
+			if (this.hStreak != hStreak)
 				this.hStreak.Dispose();
 		}
 
