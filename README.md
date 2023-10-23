@@ -1,12 +1,5 @@
 # AntiBhopCheat
-
-Detect any kinds of bhop cheat, limit bhop of flagged player or kick it, and send detailleds logs on Discord.
-
-![Preview](https://i.imgur.com/T2NYkTc.png)
-
-## Advisor Requirement
-
-For **1.5 and above** you need: https://github.com/sbpp/sourcebans-pp/pull/763/files
+Detect any kinds of bhop cheat, limit bhop of flagged player or kick it.
 
 ## Usage
 ```
@@ -20,3 +13,9 @@ sm_antibhopcheat_detection_sound <value> Emit a beep sound when someone gets fla
 sm_antibhopcheat_kick_hack <value> Automaticly Kick if a player is flagged for HACK? [0 = disabled, 1 = enabled]
 sm_antibhopcheat_count_bots <value> Should we count bots as players ?[0 = No, 1 = Yes]
 ```
+
+
+## Discord support
+[sm-plugin-AntiBhopCheat-discord](https://github.com/srcdslab/sm-plugin-AntiBhopCheat-discord)
+
+![Preview](https://i.imgur.com/T2NYkTc.png)
