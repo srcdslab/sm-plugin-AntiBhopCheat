@@ -1,7 +1,10 @@
 #include <sourcemod>
 #include <sdktools>
 #include <multicolors>
-#include <SelectiveBhop>
+
+#undef REQUIRE_PLUGIN
+#tryinclude <SelectiveBhop>
+#define REQUIRE_PLUGIN
 
 #include <basic>
 #include <CJump>
@@ -9,14 +12,16 @@
 #include <CPlayer>
 
 #define MAX_STREAKS 10
-#define VALID_MIN_JUMPS 3
+#define VALID_MIN_JUMPS 4
 #define VALID_MAX_TICKS 5
 #define VALID_MIN_VELOCITY 250
 
+int g_iSvGravity = 800;
 int g_aButtons[MAXPLAYERS + 1];
 bool g_bOnGround[MAXPLAYERS + 1];
 bool g_bHoldingJump[MAXPLAYERS + 1];
 bool g_bInJump[MAXPLAYERS + 1];
+bool g_bValidJump[MAXPLAYERS + 1];
 bool g_bNoSound = false;
 
 CPlayer g_aPlayers[MAXPLAYERS + 1] = { null, ... };
@@ -25,6 +30,8 @@ EngineVersion gEV_Type = Engine_Unknown;
 ConVar g_cDetectionSound = null;
 ConVar g_cvKickBhopHack;
 ConVar g_cvSvGravity;
+
+bool g_Plugin_SelectiveBhop = false;
 
 // Api
 Handle g_hOnClientDetected;
@@ -39,13 +46,15 @@ public Plugin myinfo =
 	name			= "AntiBhopCheat",
 	author			= "BotoX, .Rushaway",
 	description		= "Detect all kinds of bhop cheats",
-	version			= "1.7.3",
+	version			= "1.7.4",
 	url				= ""
 };
 
 public APLRes AskPluginLoad2(Handle myself, bool late, char[] error, int err_max)
 {
 	g_bLate = late;
+	g_hOnClientDetected = CreateGlobalForward("AntiBhopCheat_OnClientDetected", ET_Ignore, Param_Cell, Param_String, Param_String);
+
 	return APLRes_Success;
 }
 
@@ -62,8 +71,9 @@ public void OnPluginStart()
 	AutoExecConfig(true);
 
 	g_cvSvGravity = FindConVar("sv_gravity");
+	HookConVarChange(g_cvSvGravity, OnConVarChanged);
 
-	g_hOnClientDetected = CreateGlobalForward("AntiBhopCheat_OnClientDetected", ET_Ignore, Param_Cell, Param_String, Param_String);
+	HookEvent("player_jump", Event_PlayerJump, EventHookMode_Post);
 
 	if (g_bLate)
 	{
@@ -76,6 +86,31 @@ public void OnPluginStart()
 			}
 		}
 	}
+
+	g_bLate = false;
+}
+
+public void OnAllPluginsLoaded()
+{
+	g_Plugin_SelectiveBhop = LibraryExists("SelectiveBhop");
+}
+
+public void OnLibraryAdded(const char[] sName)
+{
+	if (strcmp(sName, "SelectiveBhop", false) == 0)
+		g_Plugin_SelectiveBhop = true;
+}
+
+public void OnLibraryRemoved(const char[] sName)
+{
+	if (strcmp(sName, "SelectiveBhop", false) == 0)
+		g_Plugin_SelectiveBhop = false;
+}
+
+void OnConVarChanged(ConVar convar, const char[] oldValue, const char[] newValue)
+{
+	if (convar == g_cvSvGravity)
+		g_iSvGravity = GetConVarInt(convar);
 }
 
 public void OnMapStart()
@@ -111,36 +146,50 @@ public void OnClientDisconnect(int client)
 	}
 }
 
-public Action OnPlayerRunCmd(int client, int &buttons)
+public void Event_PlayerJump(Handle hEvent, const char[] sName, bool bDontBroadcast)
 {
-	if (!IsClientInGame(client))
-		return Plugin_Continue;
+	int client = GetClientOfUserId(GetEventInt(hEvent, "userid"));
+
+	if (!IsClientInGame(client) || IsFakeClient(client) || !IsPlayerAlive(client) || IsClientSourceTV(client))
+		return;
 
 	MoveType ClientMoveType = GetEntityMoveType(client);
-	
-	if (IsPlayerAlive(client) && ClientMoveType != MOVETYPE_LADDER || ClientMoveType != MOVETYPE_NOCLIP || ClientMoveType != MOVETYPE_FLY || ClientMoveType != MOVETYPE_FLYGRAVITY || g_cvSvGravity.IntValue != 800)
-	{
+	bool bInWater = GetEntProp(client, Prop_Send, "m_nWaterLevel") >= 2;
+
+	if (ClientMoveType == MOVETYPE_LADDER || ClientMoveType == MOVETYPE_NOCLIP || ClientMoveType == MOVETYPE_FLY ||
+		ClientMoveType == MOVETYPE_FLYGRAVITY || bInWater || GetEntityGravity(client) != 0.0 || g_iSvGravity != 800)
+		g_bValidJump[client] = false;
+	else
+		g_bValidJump[client] = true;
+}
+
+public Action OnPlayerRunCmd(int client, int &buttons)
+{
+	if (IsClientInGame(client) && !IsFakeClient(client) && IsPlayerAlive(client) && !IsClientSourceTV(client))
 		g_aButtons[client] = buttons;
-	}
+
 	return Plugin_Continue;
 }
 
 public void OnPlayerRunCmdPost(int client, int buttons, int impulse, const float vel[3], const float angles[3], int weapon, int subtype, int cmdnum, int tickcount, int seed, const int mouse[2])
 {
-	if (!IsClientInGame(client) || !IsPlayerAlive(client))
+	if (!IsClientInGame(client) || IsFakeClient(client) || !IsPlayerAlive(client) || IsClientSourceTV(client))
+		return;
+
+	if (!g_bValidJump[client])
+		return;
+	
+	MoveType ClientMoveType = GetEntityMoveType(client);
+	if (ClientMoveType == MOVETYPE_FLY || ClientMoveType == MOVETYPE_FLYGRAVITY || GetEntityGravity(client) != 0.0 || g_iSvGravity != 800)
 		return;
 
 	CPlayer Player = g_aPlayers[client];
 
-	MoveType ClientMoveType = GetEntityMoveType(client);
 	bool bInWater = GetEntProp(client, Prop_Send, "m_nWaterLevel") >= 2;
-
 	bool bPrevOnGround = g_bOnGround[client];
 	bool bOnGround = !bInWater && GetEntityFlags(client) & FL_ONGROUND;
-
 	bool bPrevHoldingJump = g_bHoldingJump[client];
 	bool bHoldingJump = view_as<bool>(g_aButtons[client] & IN_JUMP);
-
 	bool bInJump = g_bInJump[client];
 
 	float fVecVelocity[3];
@@ -190,7 +239,7 @@ public void OnPlayerRunCmdPost(int client, int buttons, int impulse, const float
 
 void OnTouchGround(CPlayer Player, int iTick, float fVelocity)
 {
-	//PrintToServer("%d - OnTouchGround", iTick);
+	//PrintToChatAll("%d : %f - OnTouchGround", iTick, fVelocity);
 
 	CStreak CurStreak = Player.hStreak;
 	ArrayList hJumps = CurStreak.hJumps;
@@ -230,7 +279,7 @@ void OnTouchGround(CPlayer Player, int iTick, float fVelocity)
 
 void OnPressJump(CPlayer Player, int iTick, float fVelocity, bool bLeaveGround)
 {
-	//PrintToServer("%d - OnPressJump %d", iTick, bLeaveGround);
+	//PrintToChatAll("%d : %f - OnPressJump %d", iTick, fVelocity, bLeaveGround);
 
 	CStreak CurStreak = Player.hStreak;
 	ArrayList hJumps = CurStreak.hJumps;
@@ -282,7 +331,7 @@ void OnPressJump(CPlayer Player, int iTick, float fVelocity, bool bLeaveGround)
 
 void OnReleaseJump(CPlayer Player, int iTick, float fVelocity)
 {
-	//PrintToServer("%d - OnReleaseJump", iTick);
+	//PrintToChatAll("%d : %f - OnReleaseJump", iTick, fVelocity);
 
 	CStreak CurStreak = Player.hStreak;
 	ArrayList hJumps = CurStreak.hJumps;
@@ -350,30 +399,35 @@ void DoStats(CPlayer Player, CStreak CurStreak, CJump hJump)
 	CurStreak.SetJumps(aStreakJumps);
 
 	int iStreakJumps = CurStreak.iJumps;
-	if (iStreakJumps >= 6)
+	if (iStreakJumps >= 10)
 	{
 		float HackRatio = CurStreak.iHackJumps / float(iStreakJumps);
-		if (HackRatio >= 0.85 && !Player.bFlagged)
+		if (HackRatio >= 0.95 && !Player.bFlagged)
 		{
 			Player.bFlagged = true;
 			NotifyAdmins(client, "bhop hack streak");
+			ResetValues(client);
 			if (g_cvKickBhopHack.IntValue == 1)
 			{
 				KickClient(client, "Turn off your hack!");
 				LogAction(-1, client, "[AntiBhopCheat] \"%L\" was kicked for using bhop hack streak.", client);
 			}
-			ResetValues(client);
 			return;
 		}
 
 		float HyperRatio = CurStreak.iHyperJumps / float(iStreakJumps);
-		if (HyperRatio >= 0.85 && !Player.bFlagged)
+		if (HyperRatio >= 0.95 && !Player.bFlagged)
 		{
 			Player.bFlagged = true;
 			NotifyAdmins(client, "hyperscroll streak");
 			CPrintToChat(client, "{green}[SM]{default} Turn off your bhop macro/script or hyperscroll!");
-			CPrintToChat(client, "{green}[SM]{default} Your bhop has been {red}turned off{default} until the end of the map.");
-			LimitBhop(client, true);
+			#if defined _SelectiveBhop_Included
+			if (g_Plugin_SelectiveBhop)
+			{
+				LimitBhop(client, true);
+				CPrintToChat(client, "{green}[SM]{default} Your bhop has been {red}turned off{default} until the end of the map.");
+			}
+			#endif
 			ResetValues(client);
 			return;
 		}
@@ -383,27 +437,32 @@ void DoStats(CPlayer Player, CStreak CurStreak, CJump hJump)
 	if (iGlobalJumps >= 25)
 	{
 		float HackRatio = Player.iHackJumps / float(iGlobalJumps);
-		if (HackRatio >= 0.65 && !Player.bFlagged)
+		if (HackRatio >= 0.75 && !Player.bFlagged)
 		{
 			Player.bFlagged = true;
 			NotifyAdmins(client, "global bhop hack");
+			ResetValues(client);
 			if (g_cvKickBhopHack.IntValue == 1)
 			{
 				KickClient(client, "Turn off your hack!");
 				LogAction(-1, client, "[AntiBhopCheat] \"%L\" was kicked for using global bhop hack.", client);
 			}
-			ResetValues(client);
 			return;
 		}
 
 		float HyperRatio = Player.iHyperJumps / float(iGlobalJumps);
-		if (HyperRatio >= 0.50 && !Player.bFlagged)
+		if (HyperRatio >= 0.75 && !Player.bFlagged)
 		{
 			Player.bFlagged = true;
-			NotifyAdmins(client, "hyperscroll global");
+			NotifyAdmins(client, "global hyperscroll");
 			CPrintToChat(client, "{green}[SM]{default} Turn off your bhop macro/script or hyperscroll!");
-			CPrintToChat(client, "{green}[SM]{default} Your bhop has been {red}turned off{default} until the end of the map.");
-			LimitBhop(client, true);
+			#if defined _SelectiveBhop_Included
+			if (g_Plugin_SelectiveBhop)
+			{
+				LimitBhop(client, true);
+				CPrintToChat(client, "{green}[SM]{default} Your bhop has been {red}turned off{default} until the end of the map.");
+			}
+			#endif
 			ResetValues(client);
 			return;
 		}
@@ -431,7 +490,13 @@ void NotifyAdmins(int client, const char[] sReason)
 		}
 	}
 
-	Forward_OnDetected(client, sReason, g_sStats);
+	// Fire the forward
+	Call_StartForward(g_hOnClientDetected);
+	Call_PushCell(client);
+	Call_PushString(sReason);
+	Call_PushString(g_sStats);
+	Call_Finish();
+
 	g_bNoSound = false;
 }
 
@@ -451,7 +516,8 @@ public Action Command_Stats(int client, int argc)
 
 	GetCmdArg(1, sArg, sizeof(sArg));
 
-	if ((iTargetCount = ProcessTargetString(sArg, client, iTargets, MAXPLAYERS, COMMAND_FILTER_NO_MULTI | COMMAND_FILTER_NO_IMMUNITY, sTargetName, sizeof(sTargetName), bIsML)) <= 0)
+	if ((iTargetCount = ProcessTargetString(sArg, client, iTargets, MAXPLAYERS,
+		COMMAND_FILTER_NO_MULTI | COMMAND_FILTER_NO_BOTS | COMMAND_FILTER_NO_IMMUNITY, sTargetName, sizeof(sTargetName), bIsML)) <= 0)
 	{
 		ReplyToTargetError(client, iTargetCount);
 		return Plugin_Handled;
@@ -525,7 +591,8 @@ public Action Command_Streak(int client, int argc)
 		iStreak = StringToInt(sArg2);
 	}
 
-	if ((iTargetCount = ProcessTargetString(sArg, client, iTargets, MAXPLAYERS, COMMAND_FILTER_NO_MULTI | COMMAND_FILTER_NO_IMMUNITY, sTargetName, sizeof(sTargetName), bIsML)) <= 0)
+	if ((iTargetCount = ProcessTargetString(sArg, client, iTargets, MAXPLAYERS,
+		COMMAND_FILTER_NO_MULTI | COMMAND_FILTER_NO_BOTS | COMMAND_FILTER_NO_IMMUNITY, sTargetName, sizeof(sTargetName), bIsML)) <= 0)
 	{
 		ReplyToTargetError(client, iTargetCount);
 		return Plugin_Handled;
@@ -709,17 +776,6 @@ void PrintStreak(int client, int iTarget, int iStreak, bool bDetected=false)
 		iPrevEndTick = iEndTick;
 		fPrevVel = fOutVel;
 	}
-}
-
-void Forward_OnDetected(int client, const char[] reason, const char[] stats)
-{
-	Call_StartForward(g_hOnClientDetected);
-	Call_PushCell(client);
-	Call_PushString(reason);
-	Call_PushString(stats);
-	Call_Finish();
-
-	g_sStats = "";
 }
 
 stock void ResetValues(int client)
