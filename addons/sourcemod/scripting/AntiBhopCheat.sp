@@ -1,45 +1,59 @@
 #include <sourcemod>
 #include <sdktools>
 #include <multicolors>
-
-#undef REQUIRE_PLUGIN
-#tryinclude <SelectiveBhop>
-#define REQUIRE_PLUGIN
-
 #include <basic>
 #include <CJump>
 #include <CStreak>
 #include <CPlayer>
+
+#undef REQUIRE_PLUGIN
+#tryinclude <SelectiveBhop>
+#define REQUIRE_PLUGIN
 
 #define MAX_STREAKS 10
 #define VALID_MIN_JUMPS 4
 #define VALID_MAX_TICKS 5
 #define VALID_MIN_VELOCITY 250
 
-int g_iSvGravity = 800;
-int g_aButtons[MAXPLAYERS + 1];
-bool g_bOnGround[MAXPLAYERS + 1];
-bool g_bHoldingJump[MAXPLAYERS + 1];
-bool g_bInJump[MAXPLAYERS + 1];
-bool g_bValidJump[MAXPLAYERS + 1];
-bool g_bNoSound = false;
-
 CPlayer g_aPlayers[MAXPLAYERS + 1] = { null, ... };
 EngineVersion gEV_Type = Engine_Unknown;
 
-ConVar g_cDetectionSound = null;
-ConVar g_cvKickBhopHack;
-ConVar g_cvSvGravity;
+ConVar g_cvSvGravity, g_cDetectionSound = null, g_cvMaxDetections;
+ConVar g_cvCurrentJumps, g_cvCurrentHyper, g_cvCurrentHack, g_cvCurrentHackKick;
+ConVar g_cvGlobalJumps, g_cvGlobalHyper, g_cvGlobalHack, g_cvGlobalHackKick;
+#if defined _SelectiveBhop_Included
+ConVar g_cvCurrentLimitBhop, g_cvGlobalLimitBhop;
+#endif
 
-bool g_Plugin_SelectiveBhop = false;
+char g_sStats[1993], g_sBeepSound[PLATFORM_MAX_PATH];
 
-// Api
+float g_fCurrentHyper
+	, g_fCurrentHack
+	, g_fGlobalHyper
+	, g_fGlobalHack;
+
+bool g_bOnGround[MAXPLAYERS + 1]
+	, g_bHoldingJump[MAXPLAYERS + 1]
+	, g_bInJump[MAXPLAYERS + 1]
+	, g_bValidJump[MAXPLAYERS + 1]
+	, g_bCurrentHackKick
+	, g_bGlobalHackKick
+#if defined _SelectiveBhop_Included
+	, g_bCurrentHyperLimited
+	, g_bGlobalHyperLimited
+#endif
+	, g_bLate = false
+	, g_bNoSound = false
+	, g_Plugin_SelectiveBhop = false;
+
+int g_iCurrentJumps,
+	g_iGlobalJumps,
+	g_iMaxFlags,
+	g_iSvGravity = 800,
+	g_iButtons[MAXPLAYERS + 1],
+	g_iFlagged[MAXPLAYERS + 1];
+
 Handle g_hOnClientDetected;
-
-char g_sStats[1993];
-char g_sBeepSound[PLATFORM_MAX_PATH];
-
-bool g_bLate = false;
 
 public Plugin myinfo =
 {
@@ -53,6 +67,7 @@ public Plugin myinfo =
 public APLRes AskPluginLoad2(Handle myself, bool late, char[] error, int err_max)
 {
 	g_bLate = late;
+	RegPluginLibrary("AntiBhopCheat");
 	g_hOnClientDetected = CreateGlobalForward("AntiBhopCheat_OnClientDetected", ET_Ignore, Param_Cell, Param_String, Param_String);
 
 	return APLRes_Success;
@@ -62,18 +77,64 @@ public void OnPluginStart()
 {
 	LoadTranslations("common.phrases");
 
+	g_cvSvGravity = FindConVar("sv_gravity");
 	g_cDetectionSound = CreateConVar("sm_antibhopcheat_detection_sound", "1", "Emit a beep sound when someone gets flagged [0 = disabled, 1 = enabled]", 0, true, 0.0, true, 1.0);
-	g_cvKickBhopHack = CreateConVar("sm_antibhopcheat_kick_hack", "0", "Automaticly Kick if a player is flagged for HACK? [0 = disabled, 1 = enabled]", FCVAR_NOTIFY, true, 0.0, true, 1.0);
+	g_cvMaxDetections = CreateConVar("sm_antibhopcheat_max_detection", "2", "When player reach this value start apply punishements.", FCVAR_PROTECTED);
+
+	/* Current Streak */
+	g_cvCurrentJumps = CreateConVar("sm_antibhopcheat_current_jumps", "6", "Current Streak: Numbers of jumps to reach to analyze the streak", FCVAR_PROTECTED, true, 1.0);
+	g_cvCurrentHyper = CreateConVar("sm_antibhopcheat_current_hyper", "0.95", "Current Streak: Percentage to reach for detect Hyperscroll", FCVAR_PROTECTED, true, 0.0, true, 1.0);
+	g_cvCurrentHack = CreateConVar("sm_antibhopcheat_current_hack", "0.90", "Current Streak: Percentage to reach for detect Hack", FCVAR_PROTECTED, true, 0.0, true, 1.0);
+	g_cvCurrentHackKick = CreateConVar("sm_antibhopcheat_current_hack_kick", "0", "Current Streak: Kick if a player is flagged for HACK? [0 = disabled, 1 = enabled]", FCVAR_NOTIFY, true, 0.0, true, 1.0);
+
+	/* Global Streak */
+	g_cvGlobalJumps = CreateConVar("sm_antibhopcheat_global_jumps", "30", "Global Streak: Numbers of jumps to reach to analyze all player streaks", FCVAR_PROTECTED, true, 20.0);
+	g_cvGlobalHyper = CreateConVar("sm_antibhopcheat_global_hyper", "0.80", "Global Streak: Percentage to reach for detect Hyperscroll", FCVAR_PROTECTED, true, 0.0, true, 1.0);
+	g_cvGlobalHack = CreateConVar("sm_antibhopcheat_global_hack", "0.75", "Global Streak: Percentage to reach for detect Hack", FCVAR_PROTECTED, true, 0.0, true, 1.0);
+	g_cvGlobalHackKick = CreateConVar("sm_antibhopcheat_global_hack_kick", "0", "Global Streak: Kick if a player is flagged for HACK? [0 = disabled, 1 = enabled]", FCVAR_NOTIFY, true, 0.0, true, 1.0);
+
+#if defined _SelectiveBhop_Included
+	g_cvCurrentLimitBhop = CreateConVar("sm_antibhopcheat_current_limitbhop", "1", "Current Streak: Limit bhop if a player is flagged for Hyperscroll [0 = disabled, 1 = enabled]", FCVAR_NOTIFY, true, 0.0, true, 1.0);
+	g_cvGlobalLimitBhop = CreateConVar("sm_antibhopcheat_global_limitbhop", "1", "Global Streak: Limit bhop if a player is flagged for Hyperscroll [0 = disabled, 1 = enabled]", FCVAR_NOTIFY, true, 0.0, true, 1.0);
+#endif
 
 	RegAdminCmd("sm_stats", Command_Stats, ADMFLAG_GENERIC, "sm_stats <#userid|name>");
 	RegAdminCmd("sm_streak", Command_Streak, ADMFLAG_GENERIC, "sm_streak <#userid|name> [streak]");
 
 	AutoExecConfig(true);
 
-	g_cvSvGravity = FindConVar("sv_gravity");
-	HookConVarChange(g_cvSvGravity, OnConVarChanged);
-
 	HookEvent("player_jump", Event_PlayerJump, EventHookMode_Post);
+
+	HookConVarChange(g_cvSvGravity, OnConVarChanged);
+	HookConVarChange(g_cvCurrentJumps, OnConVarChanged);
+	HookConVarChange(g_cvMaxDetections, OnConVarChanged);
+	HookConVarChange(g_cvCurrentHyper, OnConVarChanged);
+	HookConVarChange(g_cvCurrentHack, OnConVarChanged);
+	HookConVarChange(g_cvCurrentHackKick, OnConVarChanged);
+	HookConVarChange(g_cvGlobalJumps, OnConVarChanged);
+	HookConVarChange(g_cvGlobalHyper, OnConVarChanged);
+	HookConVarChange(g_cvGlobalHack, OnConVarChanged);
+	HookConVarChange(g_cvGlobalHackKick, OnConVarChanged);
+#if defined _SelectiveBhop_Included
+	HookConVarChange(g_cvCurrentLimitBhop, OnConVarChanged);
+	HookConVarChange(g_cvGlobalLimitBhop, OnConVarChanged);
+#endif
+
+	// Support for plugin reload
+	g_iSvGravity = GetConVarInt(g_cvSvGravity);
+	g_iMaxFlags = GetConVarInt(g_cvMaxDetections);
+	g_iCurrentJumps = GetConVarInt(g_cvCurrentJumps);
+	g_fCurrentHyper = GetConVarFloat(g_cvCurrentHyper);
+	g_fCurrentHack = GetConVarFloat(g_cvCurrentHack);
+	g_bCurrentHackKick = GetConVarBool(g_cvCurrentHackKick);
+	g_iGlobalJumps = GetConVarInt(g_cvGlobalJumps);
+	g_fGlobalHyper = GetConVarFloat(g_cvGlobalHyper);
+	g_fGlobalHack = GetConVarFloat(g_cvGlobalHack);
+	g_bGlobalHackKick = GetConVarBool(g_cvGlobalHackKick);
+#if defined _SelectiveBhop_Included
+	g_bCurrentHyperLimited = GetConVarBool(g_cvCurrentLimitBhop);
+	g_bGlobalHyperLimited = GetConVarBool(g_cvGlobalLimitBhop);
+#endif
 
 	if (g_bLate)
 	{
@@ -82,12 +143,10 @@ public void OnPluginStart()
 			if (IsClientConnected(client))
 			{
 				if (IsClientInGame(client))
-					OnClientPutInServer(client);
+					ResetPlayerData(client);
 			}
 		}
 	}
-
-	g_bLate = false;
 }
 
 public void OnAllPluginsLoaded()
@@ -111,6 +170,30 @@ void OnConVarChanged(ConVar convar, const char[] oldValue, const char[] newValue
 {
 	if (convar == g_cvSvGravity)
 		g_iSvGravity = GetConVarInt(convar);
+	else if (convar == g_cvMaxDetections)
+		g_iMaxFlags = GetConVarInt(convar);
+	else if (convar == g_cvCurrentJumps)
+		g_iCurrentJumps = GetConVarInt(convar);
+	else if (convar == g_cvCurrentHyper)
+		g_fCurrentHyper = GetConVarFloat(convar);
+	else if (convar == g_cvCurrentHack)
+		g_fCurrentHack = GetConVarFloat(convar);
+	else if (convar == g_cvCurrentHackKick)
+		g_bCurrentHackKick = GetConVarBool(convar);
+	else if (convar == g_cvGlobalJumps)
+		g_iGlobalJumps = GetConVarInt(convar);
+	else if (convar == g_cvGlobalHyper)
+		g_fGlobalHyper = GetConVarFloat(convar);
+	else if (convar == g_cvGlobalHack)
+		g_fGlobalHack = GetConVarFloat(convar);
+	else if (convar == g_cvGlobalHackKick)
+		g_bGlobalHackKick = GetConVarBool(convar);
+#if defined _SelectiveBhop_Included
+	else if (convar == g_cvCurrentLimitBhop)
+		g_bCurrentHyperLimited = GetConVarBool(convar);
+	else if (convar == g_cvGlobalLimitBhop)
+		g_bGlobalHyperLimited = GetConVarBool(convar);
+#endif
 }
 
 public void OnMapStart()
@@ -120,7 +203,6 @@ public void OnMapStart()
 	if (hConfig == null)
 	{
 		SetFailState("Unable to load game config funcommands.games");
-
 		return;
 	}
 
@@ -130,20 +212,15 @@ public void OnMapStart()
 	delete hConfig;
 }
 
-public void OnClientPutInServer(int client)
+public void OnClientConnected(int client)
 {
-	g_aPlayers[client] = new CPlayer(client);
-	ResetValues(client);
+	InitPlayerData(client);
 }
 
 public void OnClientDisconnect(int client)
 {
-	ResetValues(client);
-	if (g_aPlayers[client] != null)
-	{
-		g_aPlayers[client].Dispose();
-		g_aPlayers[client] = null;
-	}
+	DeletePlayerData(client);
+	g_iFlagged[client] = 0;
 }
 
 public void Event_PlayerJump(Handle hEvent, const char[] sName, bool bDontBroadcast)
@@ -166,7 +243,7 @@ public void Event_PlayerJump(Handle hEvent, const char[] sName, bool bDontBroadc
 public Action OnPlayerRunCmd(int client, int &buttons)
 {
 	if (IsClientInGame(client) && !IsFakeClient(client) && IsPlayerAlive(client) && !IsClientSourceTV(client))
-		g_aButtons[client] = buttons;
+		g_iButtons[client] = buttons;
 
 	return Plugin_Continue;
 }
@@ -189,7 +266,7 @@ public void OnPlayerRunCmdPost(int client, int buttons, int impulse, const float
 	bool bPrevOnGround = g_bOnGround[client];
 	bool bOnGround = !bInWater && GetEntityFlags(client) & FL_ONGROUND;
 	bool bPrevHoldingJump = g_bHoldingJump[client];
-	bool bHoldingJump = view_as<bool>(g_aButtons[client] & IN_JUMP);
+	bool bHoldingJump = view_as<bool>(g_iButtons[client] & IN_JUMP);
 	bool bInJump = g_bInJump[client];
 
 	float fVecVelocity[3];
@@ -378,7 +455,8 @@ void DoStats(CPlayer Player, CStreak CurStreak, CJump hJump)
 		Player.iHyperJumps++;
 	}
 
-	if (iNextJump != -1 && iNextJump <= 1 && (iLastJunk > 5 || iPresses <= 2) && hJump.fEndVel >= 285.0)
+	// fEndVel higher has 600 are 95% false flags... (client get teleported/boosted or fall for high position)
+	if (iNextJump != -1 && iNextJump <= 1 && (iLastJunk > 5 || iPresses <= 2) && hJump.fEndVel >= 285.0 && hJump.fEndVel <= 599.0)
 	{
 		CurStreak.iHackJumps++;
 		Player.iHackJumps++;
@@ -399,72 +477,88 @@ void DoStats(CPlayer Player, CStreak CurStreak, CJump hJump)
 	CurStreak.SetJumps(aStreakJumps);
 
 	int iStreakJumps = CurStreak.iJumps;
-	if (iStreakJumps >= 10)
+	if (iStreakJumps >= g_iCurrentJumps)
 	{
 		float HackRatio = CurStreak.iHackJumps / float(iStreakJumps);
-		if (HackRatio >= 0.95 && !Player.bFlagged)
+		if (HackRatio >= g_fCurrentHack && !Player.bFlagged)
 		{
-			Player.bFlagged = true;
-			NotifyAdmins(client, "bhop hack streak");
-			ResetValues(client);
-			if (g_cvKickBhopHack.IntValue == 1)
+			g_iFlagged[client]++;
+			if (g_iFlagged[client] >= g_iMaxFlags)
 			{
-				KickClient(client, "Turn off your hack!");
-				LogAction(-1, client, "[AntiBhopCheat] \"%L\" was kicked for using bhop hack streak.", client);
+				Player.bFlagged = true;
+				NotifyAdmins(client, "bhop hack streak");
+				if (g_bCurrentHackKick)
+				{
+					KickClient(client, "Turn off your hack!");
+					LogAction(-1, client, "[AntiBhopCheat] \"%L\" was kicked for using bhop hack streak.", client);
+				}
+				return;
 			}
-			return;
+			ResetPlayerData(client);
 		}
 
 		float HyperRatio = CurStreak.iHyperJumps / float(iStreakJumps);
-		if (HyperRatio >= 0.95 && !Player.bFlagged)
+		if (HyperRatio >= g_fCurrentHyper && !Player.bFlagged)
 		{
-			Player.bFlagged = true;
-			NotifyAdmins(client, "hyperscroll streak");
-			CPrintToChat(client, "{green}[SM]{default} Turn off your bhop macro/script or hyperscroll!");
-			#if defined _SelectiveBhop_Included
-			if (g_Plugin_SelectiveBhop)
+			g_iFlagged[client]++;
+			if (g_iFlagged[client] >= g_iMaxFlags)
 			{
-				LimitBhop(client, true);
-				CPrintToChat(client, "{green}[SM]{default} Your bhop has been {red}turned off{default} until the end of the map.");
+				Player.bFlagged = true;
+				NotifyAdmins(client, "hyperscroll streak");
+				CPrintToChat(client, "{green}[SM]{default} Turn off your bhop macro/script or hyperscroll!");
+				#if defined _SelectiveBhop_Included
+				if (g_Plugin_SelectiveBhop && g_bCurrentHyperLimited)
+				{
+					LimitBhop(client, true);
+					CPrintToChat(client, "{green}[SM]{default} Your bhop has been {red}turned off{default} until the end of the map.");
+				}
+				#endif
+				return;
 			}
-			#endif
-			ResetValues(client);
-			return;
+			ResetPlayerData(client);
 		}
 	}
 
 	int iGlobalJumps = Player.iJumps;
-	if (iGlobalJumps >= 25)
+	if (iGlobalJumps >= g_iGlobalJumps)
 	{
 		float HackRatio = Player.iHackJumps / float(iGlobalJumps);
-		if (HackRatio >= 0.75 && !Player.bFlagged)
+		if (HackRatio >= g_fGlobalHack && !Player.bFlagged)
 		{
-			Player.bFlagged = true;
-			NotifyAdmins(client, "global bhop hack");
-			ResetValues(client);
-			if (g_cvKickBhopHack.IntValue == 1)
+			g_iFlagged[client]++;
+			if (g_iFlagged[client] >= g_iMaxFlags)
 			{
-				KickClient(client, "Turn off your hack!");
-				LogAction(-1, client, "[AntiBhopCheat] \"%L\" was kicked for using global bhop hack.", client);
+				Player.bFlagged = true;
+				NotifyAdmins(client, "global bhop hack");
+				if (g_bGlobalHackKick)
+				{
+					KickClient(client, "Turn off your hack!");
+					LogAction(-1, client, "[AntiBhopCheat] \"%L\" was kicked for using global bhop hack.", client);
+				}
+				return;
 			}
-			return;
+			ResetPlayerData(client);
 		}
 
 		float HyperRatio = Player.iHyperJumps / float(iGlobalJumps);
-		if (HyperRatio >= 0.75 && !Player.bFlagged)
+		if (HyperRatio >= g_fGlobalHyper && !Player.bFlagged)
 		{
-			Player.bFlagged = true;
-			NotifyAdmins(client, "global hyperscroll");
-			CPrintToChat(client, "{green}[SM]{default} Turn off your bhop macro/script or hyperscroll!");
-			#if defined _SelectiveBhop_Included
-			if (g_Plugin_SelectiveBhop)
+			g_iFlagged[client]++;
+			if (g_iFlagged[client] >= g_iMaxFlags)
 			{
-				LimitBhop(client, true);
-				CPrintToChat(client, "{green}[SM]{default} Your bhop has been {red}turned off{default} until the end of the map.");
+				Player.bFlagged = true;
+				NotifyAdmins(client, "global hyperscroll");
+				CPrintToChat(client, "{green}[SM]{default} Turn off your bhop macro/script or hyperscroll!");
+				#if defined _SelectiveBhop_Included
+				if (g_Plugin_SelectiveBhop && g_bGlobalHyperLimited)
+				{
+					LimitBhop(client, true);
+					CPrintToChat(client, "{green}[SM]{default} Your bhop has been {red}turned off{default} until the end of the map.");
+				}
+				#endif
+				return;
 			}
-			#endif
-			ResetValues(client);
-			return;
+			ResetPlayerData(client);
 		}
 	}
 }
@@ -490,13 +584,7 @@ void NotifyAdmins(int client, const char[] sReason)
 		}
 	}
 
-	// Fire the forward
-	Call_StartForward(g_hOnClientDetected);
-	Call_PushCell(client);
-	Call_PushString(sReason);
-	Call_PushString(g_sStats);
-	Call_Finish();
-
+	Forward_OnDetected(client, sReason, g_sStats);
 	g_bNoSound = false;
 }
 
@@ -778,9 +866,37 @@ void PrintStreak(int client, int iTarget, int iStreak, bool bDetected=false)
 	}
 }
 
-stock void ResetValues(int client)
+void Forward_OnDetected(int client, const char[] reason, const char[] stats)
 {
+	Call_StartForward(g_hOnClientDetected);
+	Call_PushCell(client);
+	Call_PushString(reason);
+	Call_PushString(stats);
+	Call_Finish();
+
+	g_sStats = "";
+}
+
+stock void InitPlayerData(int client)
+{
+	g_aPlayers[client] = new CPlayer(client);
+	g_bValidJump[client] = true;
 	g_bOnGround[client] = false;
 	g_bHoldingJump[client] = false;
 	g_bInJump[client] = false;
+}
+
+stock void DeletePlayerData(int client)
+{
+	if (g_aPlayers[client] != null)
+	{
+		g_aPlayers[client].Dispose();
+		g_aPlayers[client] = null;
+	}
+}
+
+stock void ResetPlayerData(int client)
+{
+	DeletePlayerData(client);
+	InitPlayerData(client);
 }
