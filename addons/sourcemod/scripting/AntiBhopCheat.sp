@@ -121,7 +121,6 @@ public void OnPluginStart()
 #endif
 
 	// Support for plugin reload
-	g_iSvGravity = GetConVarInt(g_cvSvGravity);
 	g_iMaxFlags = GetConVarInt(g_cvMaxDetections);
 	g_iCurrentJumps = GetConVarInt(g_cvCurrentJumps);
 	g_fCurrentHyper = GetConVarFloat(g_cvCurrentHyper);
@@ -164,6 +163,11 @@ public void OnLibraryRemoved(const char[] sName)
 {
 	if (strcmp(sName, "SelectiveBhop", false) == 0)
 		g_Plugin_SelectiveBhop = false;
+}
+
+public void OnConfigsExecuted()
+{
+	g_iSvGravity = GetConVarInt(g_cvSvGravity);
 }
 
 void OnConVarChanged(ConVar convar, const char[] oldValue, const char[] newValue)
