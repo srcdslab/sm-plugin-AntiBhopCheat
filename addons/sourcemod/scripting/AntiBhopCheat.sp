@@ -120,21 +120,6 @@ public void OnPluginStart()
 	HookConVarChange(g_cvGlobalLimitBhop, OnConVarChanged);
 #endif
 
-	// Support for plugin reload
-	g_iMaxFlags = GetConVarInt(g_cvMaxDetections);
-	g_iCurrentJumps = GetConVarInt(g_cvCurrentJumps);
-	g_fCurrentHyper = GetConVarFloat(g_cvCurrentHyper);
-	g_fCurrentHack = GetConVarFloat(g_cvCurrentHack);
-	g_bCurrentHackKick = GetConVarBool(g_cvCurrentHackKick);
-	g_iGlobalJumps = GetConVarInt(g_cvGlobalJumps);
-	g_fGlobalHyper = GetConVarFloat(g_cvGlobalHyper);
-	g_fGlobalHack = GetConVarFloat(g_cvGlobalHack);
-	g_bGlobalHackKick = GetConVarBool(g_cvGlobalHackKick);
-#if defined _SelectiveBhop_Included
-	g_bCurrentHyperLimited = GetConVarBool(g_cvCurrentLimitBhop);
-	g_bGlobalHyperLimited = GetConVarBool(g_cvGlobalLimitBhop);
-#endif
-
 	if (g_bLate)
 	{
 		for (int client = 1; client <= MaxClients; client++)
@@ -168,6 +153,19 @@ public void OnLibraryRemoved(const char[] sName)
 public void OnConfigsExecuted()
 {
 	g_iSvGravity = GetConVarInt(g_cvSvGravity);
+	g_iMaxFlags = GetConVarInt(g_cvMaxDetections);
+	g_iCurrentJumps = GetConVarInt(g_cvCurrentJumps);
+	g_fCurrentHyper = GetConVarFloat(g_cvCurrentHyper);
+	g_fCurrentHack = GetConVarFloat(g_cvCurrentHack);
+	g_bCurrentHackKick = GetConVarBool(g_cvCurrentHackKick);
+	g_iGlobalJumps = GetConVarInt(g_cvGlobalJumps);
+	g_fGlobalHyper = GetConVarFloat(g_cvGlobalHyper);
+	g_fGlobalHack = GetConVarFloat(g_cvGlobalHack);
+	g_bGlobalHackKick = GetConVarBool(g_cvGlobalHackKick);
+#if defined _SelectiveBhop_Included
+	g_bCurrentHyperLimited = GetConVarBool(g_cvCurrentLimitBhop);
+	g_bGlobalHyperLimited = GetConVarBool(g_cvGlobalLimitBhop);
+#endif
 }
 
 void OnConVarChanged(ConVar convar, const char[] oldValue, const char[] newValue)
