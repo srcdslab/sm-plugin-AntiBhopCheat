@@ -60,7 +60,7 @@ public Plugin myinfo =
 	name			= "AntiBhopCheat",
 	author			= "BotoX, .Rushaway",
 	description		= "Detect all kinds of bhop cheats",
-	version			= "1.7.4",
+	version			= "1.7.5",
 	url				= ""
 };
 
@@ -236,7 +236,7 @@ public void Event_PlayerJump(Handle hEvent, const char[] sName, bool bDontBroadc
 	bool bInWater = GetEntProp(client, Prop_Send, "m_nWaterLevel") >= 2;
 
 	if (ClientMoveType == MOVETYPE_LADDER || ClientMoveType == MOVETYPE_NOCLIP || ClientMoveType == MOVETYPE_FLY ||
-		ClientMoveType == MOVETYPE_FLYGRAVITY || bInWater || GetEntityGravity(client) != 0.0 || g_iSvGravity != 800)
+		ClientMoveType == MOVETYPE_FLYGRAVITY || bInWater || GetEntityGravity(client) != 1.0 || g_iSvGravity != 800)
 		g_bValidJump[client] = false;
 	else
 		g_bValidJump[client] = true;
@@ -259,7 +259,7 @@ public void OnPlayerRunCmdPost(int client, int buttons, int impulse, const float
 		return;
 	
 	MoveType ClientMoveType = GetEntityMoveType(client);
-	if (ClientMoveType == MOVETYPE_FLY || ClientMoveType == MOVETYPE_FLYGRAVITY || GetEntityGravity(client) != 0.0 || g_iSvGravity != 800)
+	if (ClientMoveType == MOVETYPE_FLY || ClientMoveType == MOVETYPE_FLYGRAVITY || GetEntityGravity(client) != 1.0 || g_iSvGravity != 800)
 		return;
 
 	CPlayer Player = g_aPlayers[client];
@@ -488,15 +488,16 @@ void DoStats(CPlayer Player, CStreak CurStreak, CJump hJump)
 			if (g_iFlagged[client] >= g_iMaxFlags)
 			{
 				Player.bFlagged = true;
-				NotifyAdmins(client, "bhop hack streak");
+				NotifyAdmins(client, "has been detected for bhop hack streak");
 				if (g_bCurrentHackKick)
 				{
-					KickClient(client, "Turn off your hack!");
 					LogAction(-1, client, "[AntiBhopCheat] \"%L\" was kicked for using bhop hack streak.", client);
+					KickClient(client, "Turn off your hack!");
 				}
 				return;
 			}
-			ResetPlayerData(client);
+			NotifyAdmins(client, "is suspected using bhop hack streak");
+			ResetValues(client);
 		}
 
 		float HyperRatio = CurStreak.iHyperJumps / float(iStreakJumps);
@@ -506,7 +507,7 @@ void DoStats(CPlayer Player, CStreak CurStreak, CJump hJump)
 			if (g_iFlagged[client] >= g_iMaxFlags)
 			{
 				Player.bFlagged = true;
-				NotifyAdmins(client, "hyperscroll streak");
+				NotifyAdmins(client, "has been detected for hyperscroll streak");
 				CPrintToChat(client, "{green}[SM]{default} Turn off your bhop macro/script or hyperscroll!");
 				#if defined _SelectiveBhop_Included
 				if (g_Plugin_SelectiveBhop && g_bCurrentHyperLimited)
@@ -517,7 +518,8 @@ void DoStats(CPlayer Player, CStreak CurStreak, CJump hJump)
 				#endif
 				return;
 			}
-			ResetPlayerData(client);
+			NotifyAdmins(client, "is suspected using hyperscroll streak");
+			ResetValues(client);
 		}
 	}
 
@@ -531,15 +533,16 @@ void DoStats(CPlayer Player, CStreak CurStreak, CJump hJump)
 			if (g_iFlagged[client] >= g_iMaxFlags)
 			{
 				Player.bFlagged = true;
-				NotifyAdmins(client, "global bhop hack");
+				NotifyAdmins(client, "has been detected for global bhop hack");
 				if (g_bGlobalHackKick)
 				{
-					KickClient(client, "Turn off your hack!");
 					LogAction(-1, client, "[AntiBhopCheat] \"%L\" was kicked for using global bhop hack.", client);
+					KickClient(client, "Turn off your hack!");
 				}
 				return;
 			}
-			ResetPlayerData(client);
+			NotifyAdmins(client, "is suspected using global bhop hack");
+			ResetValues(client);
 		}
 
 		float HyperRatio = Player.iHyperJumps / float(iGlobalJumps);
@@ -549,7 +552,7 @@ void DoStats(CPlayer Player, CStreak CurStreak, CJump hJump)
 			if (g_iFlagged[client] >= g_iMaxFlags)
 			{
 				Player.bFlagged = true;
-				NotifyAdmins(client, "global hyperscroll");
+				NotifyAdmins(client, "has been detected for global hyperscroll");
 				CPrintToChat(client, "{green}[SM]{default} Turn off your bhop macro/script or hyperscroll!");
 				#if defined _SelectiveBhop_Included
 				if (g_Plugin_SelectiveBhop && g_bGlobalHyperLimited)
@@ -560,7 +563,8 @@ void DoStats(CPlayer Player, CStreak CurStreak, CJump hJump)
 				#endif
 				return;
 			}
-			ResetPlayerData(client);
+			NotifyAdmins(client, "is suspected using global hyperscroll");
+			ResetValues(client);
 		}
 	}
 }
@@ -571,7 +575,7 @@ void NotifyAdmins(int client, const char[] sReason)
 	{
 		if (IsClientInGame(i) && !IsFakeClient(i) && CheckCommandAccess(i, "sm_stats", ADMFLAG_GENERIC))
 		{
-			CPrintToChat(i, "{green}[SM]{red} %N {default}has been detected for {red}%s{default}", client, sReason);
+			CPrintToChat(i, "{green}[SM]{olive} %N {red}%s", client, sReason);
 			CPrintToChat(i, "{green}[SM]{red} Please check your console if it's not a false flag.");
 			PrintStats(i, client);
 			PrintStreak(i, client, -1, true);
@@ -587,7 +591,18 @@ void NotifyAdmins(int client, const char[] sReason)
 	}
 
 	Forward_OnDetected(client, sReason, g_sStats);
+
+	// Fully reset player stats. We want to analyse a new whole streak.
+	CreateTimer(0.3, Timer_OnDetected, client, TIMER_FLAG_NO_MAPCHANGE);
 	g_bNoSound = false;
+}
+
+public Action Timer_OnDetected(Handle timer, any client) {
+	if (!client)
+		return Plugin_Stop;
+
+	ResetPlayerData(client);
+	return Plugin_Continue;
 }
 
 public Action Command_Stats(int client, int argc)
@@ -703,7 +718,7 @@ void PrintStreak(int client, int iTarget, int iStreak, bool bDetected=false)
 	PrintToConsole(client, "[SM] Bunnyhop streak %d for %L", iStreak, iTarget);
 
 	if (bDetected)
-		Format(g_sStats, sizeof(g_sStats), "%sBunnyhop streak %d for %L\n",
+		FormatEx(g_sStats, sizeof(g_sStats), "%sBunnyhop streak %d for %L\n",
 		g_sStats, iStreak, iTarget);
 
 	CPlayer Player = g_aPlayers[iTarget];
@@ -743,7 +758,7 @@ void PrintStreak(int client, int iTarget, int iStreak, bool bDetected=false)
 		iStreakJumps, HyperRatio * 100.0, HackRatio * 100.0);
 
 	if (bDetected)
-		Format(g_sStats, sizeof(g_sStats), "%sStreak jumps: %d | Hyper?: %.1f%% | Hack?: %.1f%%\n",
+		FormatEx(g_sStats, sizeof(g_sStats), "%sStreak jumps: %d | Hyper?: %.1f%% | Hack?: %.1f%%\n",
 		g_sStats, iStreakJumps, HyperRatio * 100.0, HackRatio * 100.0);
 
 	int aStreakJumps[3];
@@ -765,7 +780,7 @@ void PrintStreak(int client, int iTarget, int iStreak, bool bDetected=false)
 		"id", " diff", "  invel", " outvel", " gain", " comb", " avgdist", " num", " avg+-", "pattern");
 
 	if (bDetected)
-		Format(g_sStats, sizeof(g_sStats), "%s#%2s %5s %7s %7s %5s %5s %8s %4s %6s   %s\n",
+		FormatEx(g_sStats, sizeof(g_sStats), "%s#%2s %5s %7s %7s %5s %5s %8s %4s %6s   %s\n",
 		g_sStats, "id", " diff", "  invel", " outvel", " gain", " comb", " avgdist", " num", " avg+-", "pattern");
 
 	ArrayList hJumps = hStreak.hJumps;
@@ -850,7 +865,7 @@ void PrintStreak(int client, int iTarget, int iStreak, bool bDetected=false)
 			sPattern);
 
 		if (bDetected)
-			Format(g_sStats, sizeof(g_sStats), "%s#%2d %4d%% %7.1f %7.1f %4d%% %4d%% %8.2f %4d %6.2f   %s\n",
+			FormatEx(g_sStats, sizeof(g_sStats), "%s#%2d %4d%% %7.1f %7.1f %4d%% %4d%% %8.2f %4d %6.2f   %s\n",
 			g_sStats,
 			i,
 			fPrevVel == 0.0 ? 100 : RoundFloat((fInVel / fPrevVel) * 100.0 - 100.0),
@@ -882,10 +897,7 @@ void Forward_OnDetected(int client, const char[] reason, const char[] stats)
 stock void InitPlayerData(int client)
 {
 	g_aPlayers[client] = new CPlayer(client);
-	g_bValidJump[client] = true;
-	g_bOnGround[client] = false;
-	g_bHoldingJump[client] = false;
-	g_bInJump[client] = false;
+	ResetValues(client);
 }
 
 stock void DeletePlayerData(int client)
@@ -895,6 +907,14 @@ stock void DeletePlayerData(int client)
 		g_aPlayers[client].Dispose();
 		g_aPlayers[client] = null;
 	}
+}
+
+stock void ResetValues(int client)
+{
+	g_bValidJump[client] = true;
+	g_bOnGround[client] = false;
+	g_bHoldingJump[client] = false;
+	g_bInJump[client] = false;
 }
 
 stock void ResetPlayerData(int client)
