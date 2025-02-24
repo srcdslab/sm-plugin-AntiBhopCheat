@@ -23,7 +23,7 @@
 CPlayer g_aPlayers[MAXPLAYERS + 1] = { null, ... };
 EngineVersion gEV_Type = Engine_Unknown;
 
-ConVar g_cvSvGravity, g_cDetectionSound = null, g_cvMaxDetections;
+ConVar g_cvSvGravity, g_cvSvAutoBhop, g_cDetectionSound = null, g_cvMaxDetections;
 ConVar g_cvCurrentJumps, g_cvCurrentHyper, g_cvCurrentHack, g_cvCurrentHackKick;
 ConVar g_cvGlobalJumps, g_cvGlobalHyper, g_cvGlobalHack, g_cvGlobalHackKick;
 #if defined _SelectiveBhop_Included
@@ -49,7 +49,10 @@ bool g_bOnGround[MAXPLAYERS + 1]
 	, g_bGlobalHackHyperLimited
 	, g_bLate = false
 	, g_bNoSound = false
-	, g_Plugin_SelectiveBhop = false;
+#if defined _SelectiveBhop_Included
+	, g_Plugin_SelectiveBhop = false
+#endif
+	, g_bSvAutoBhop;
 
 int g_iCurrentJumps,
 	g_iGlobalJumps,
@@ -65,7 +68,7 @@ public Plugin myinfo =
 	name			= "AntiBhopCheat",
 	author			= "BotoX, .Rushaway",
 	description		= "Detect all kinds of bhop cheats",
-	version			= "1.7.8",
+	version			= "1.8.0",
 	url				= ""
 };
 
@@ -83,6 +86,7 @@ public void OnPluginStart()
 	LoadTranslations("common.phrases");
 
 	g_cvSvGravity = FindConVar("sv_gravity");
+	g_cvSvAutoBhop = FindConVar("sv_autobunnyhopping");
 	g_cDetectionSound = CreateConVar("sm_antibhopcheat_detection_sound", "1", "Emit a beep sound when someone gets flagged [0 = disabled, 1 = enabled]", 0, true, 0.0, true, 1.0);
 	g_cvMaxDetections = CreateConVar("sm_antibhopcheat_max_detection", "2", "When player reach this value start apply punishements.", FCVAR_PROTECTED);
 
@@ -112,6 +116,7 @@ public void OnPluginStart()
 	OnConfigsExecuted();
 
 	HookConVarChange(g_cvSvGravity, OnConVarChanged);
+	HookConVarChange(g_cvSvAutoBhop, OnConVarChanged);
 	HookConVarChange(g_cDetectionSound, OnConVarChanged);
 	HookConVarChange(g_cvMaxDetections, OnConVarChanged);
 	HookConVarChange(g_cvCurrentJumps, OnConVarChanged);
@@ -142,6 +147,7 @@ public void OnPluginStart()
 	}
 }
 
+#if defined _SelectiveBhop_Included
 public void OnAllPluginsLoaded()
 {
 	g_Plugin_SelectiveBhop = LibraryExists("SelectiveBhop");
@@ -158,10 +164,12 @@ public void OnLibraryRemoved(const char[] sName)
 	if (strcmp(sName, "SelectiveBhop", false) == 0)
 		g_Plugin_SelectiveBhop = false;
 }
+#endif
 
 public void OnConfigsExecuted()
 {
 	g_iSvGravity = GetConVarInt(g_cvSvGravity);
+	g_bSvAutoBhop = GetConVarBool(g_cvSvAutoBhop);
 	g_bNoSound = GetConVarBool(g_cDetectionSound);
 	g_iMaxFlags = GetConVarInt(g_cvMaxDetections);
 	g_iCurrentJumps = GetConVarInt(g_cvCurrentJumps);
@@ -184,6 +192,8 @@ void OnConVarChanged(ConVar convar, const char[] oldValue, const char[] newValue
 {
 	if (convar == g_cvSvGravity)
 		g_iSvGravity = GetConVarInt(convar);
+	else if (convar == g_cvSvAutoBhop)
+		g_bSvAutoBhop = GetConVarBool(convar);
 	else if (convar == g_cDetectionSound)
 		g_bNoSound = GetConVarBool(convar);
 	else if (convar == g_cvMaxDetections)
@@ -247,7 +257,7 @@ public void OnClientDisconnect(int client)
 
 public Action OnPlayerRunCmd(int client, int &buttons)
 {
-	if (!IsClientInGame(client) || IsFakeClient(client) || !IsPlayerAlive(client) || IsClientSourceTV(client))
+	if (g_bSvAutoBhop || !IsClientInGame(client) || IsFakeClient(client) || !IsPlayerAlive(client) || IsClientSourceTV(client))
 		return Plugin_Continue;
 
 	g_iButtons[client] = buttons;
@@ -256,7 +266,7 @@ public Action OnPlayerRunCmd(int client, int &buttons)
 
 public void OnPlayerRunCmdPost(int client, int buttons, int impulse, const float vel[3], const float angles[3], int weapon, int subtype, int cmdnum, int tickcount, int seed, const int mouse[2])
 {
-	if (g_iSvGravity != 800 || !IsClientInGame(client) || IsFakeClient(client) || !IsPlayerAlive(client) || IsClientSourceTV(client))
+	if (g_bSvAutoBhop || g_iSvGravity != 800 || !IsClientInGame(client) || IsFakeClient(client) || !IsPlayerAlive(client) || IsClientSourceTV(client))
 		return;
 
 	float fVecVelocity[3];
