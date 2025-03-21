@@ -68,7 +68,7 @@ public Plugin myinfo =
 	name			= "AntiBhopCheat",
 	author			= "BotoX, .Rushaway",
 	description		= "Detect all kinds of bhop cheats",
-	version			= "1.8.0",
+	version			= "1.8.1",
 	url				= ""
 };
 
@@ -116,7 +116,8 @@ public void OnPluginStart()
 	OnConfigsExecuted();
 
 	HookConVarChange(g_cvSvGravity, OnConVarChanged);
-	HookConVarChange(g_cvSvAutoBhop, OnConVarChanged);
+	if (g_cvSvAutoBhop != null)
+		HookConVarChange(g_cvSvAutoBhop, OnConVarChanged);
 	HookConVarChange(g_cDetectionSound, OnConVarChanged);
 	HookConVarChange(g_cvMaxDetections, OnConVarChanged);
 	HookConVarChange(g_cvCurrentJumps, OnConVarChanged);
@@ -169,7 +170,10 @@ public void OnLibraryRemoved(const char[] sName)
 public void OnConfigsExecuted()
 {
 	g_iSvGravity = GetConVarInt(g_cvSvGravity);
-	g_bSvAutoBhop = GetConVarBool(g_cvSvAutoBhop);
+	if (g_cvSvAutoBhop != null)
+		g_bSvAutoBhop = GetConVarBool(g_cvSvAutoBhop);
+	else
+		g_bSvAutoBhop = false;
 	g_bNoSound = GetConVarBool(g_cDetectionSound);
 	g_iMaxFlags = GetConVarInt(g_cvMaxDetections);
 	g_iCurrentJumps = GetConVarInt(g_cvCurrentJumps);
@@ -192,7 +196,7 @@ void OnConVarChanged(ConVar convar, const char[] oldValue, const char[] newValue
 {
 	if (convar == g_cvSvGravity)
 		g_iSvGravity = GetConVarInt(convar);
-	else if (convar == g_cvSvAutoBhop)
+	else if (convar == g_cvSvAutoBhop && g_cvSvAutoBhop != null)
 		g_bSvAutoBhop = GetConVarBool(convar);
 	else if (convar == g_cDetectionSound)
 		g_bNoSound = GetConVarBool(convar);
