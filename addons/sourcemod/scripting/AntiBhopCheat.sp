@@ -23,7 +23,7 @@
 CPlayer g_aPlayers[MAXPLAYERS + 1] = { null, ... };
 EngineVersion gEV_Type = Engine_Unknown;
 
-ConVar g_cvSvGravity, g_cvSvAutoBhop, g_cDetectionSound = null, g_cvMaxDetections;
+ConVar g_cvEnabled, g_cvSvGravity, g_cvSvAutoBhop, g_cDetectionSound = null, g_cvMaxDetections;
 ConVar g_cvCurrentJumps, g_cvCurrentHyper, g_cvCurrentHack, g_cvCurrentHackKick;
 ConVar g_cvGlobalJumps, g_cvGlobalHyper, g_cvGlobalHack, g_cvGlobalHackKick;
 #if defined _SelectiveBhop_Included
@@ -49,6 +49,7 @@ bool g_bOnGround[MAXPLAYERS + 1]
 	, g_bGlobalHackHyperLimited
 	, g_bLate = false
 	, g_bNoSound = false
+	, g_bPluginEnabled = true
 #if defined _SelectiveBhop_Included
 	, g_Plugin_SelectiveBhop = false
 #endif
@@ -68,7 +69,7 @@ public Plugin myinfo =
 	name			= "AntiBhopCheat",
 	author			= "BotoX, .Rushaway",
 	description		= "Detect all kinds of bhop cheats",
-	version			= "1.8.1",
+	version			= "1.8.2",
 	url				= ""
 };
 
@@ -84,6 +85,8 @@ public APLRes AskPluginLoad2(Handle myself, bool late, char[] error, int err_max
 public void OnPluginStart()
 {
 	LoadTranslations("common.phrases");
+
+	g_cvEnabled = CreateConVar("sm_antibhopcheat_enabled", "1", "Enable/Disable AntiBhopCheat plugin [0 = disabled, 1 = enabled]", FCVAR_NOTIFY, true, 0.0, true, 1.0);
 
 	g_cvSvGravity = FindConVar("sv_gravity");
 	g_cvSvAutoBhop = FindConVar("sv_autobunnyhopping");
@@ -115,6 +118,7 @@ public void OnPluginStart()
 	AutoExecConfig(true);
 	OnConfigsExecuted();
 
+	HookConVarChange(g_cvEnabled, OnConVarChanged);
 	HookConVarChange(g_cvSvGravity, OnConVarChanged);
 	if (g_cvSvAutoBhop != null)
 		HookConVarChange(g_cvSvAutoBhop, OnConVarChanged);
@@ -169,6 +173,7 @@ public void OnLibraryRemoved(const char[] sName)
 
 public void OnConfigsExecuted()
 {
+	g_bPluginEnabled = GetConVarBool(g_cvEnabled);
 	g_iSvGravity = GetConVarInt(g_cvSvGravity);
 	if (g_cvSvAutoBhop != null)
 		g_bSvAutoBhop = GetConVarBool(g_cvSvAutoBhop);
@@ -194,7 +199,20 @@ public void OnConfigsExecuted()
 
 void OnConVarChanged(ConVar convar, const char[] oldValue, const char[] newValue)
 {
-	if (convar == g_cvSvGravity)
+	if (convar == g_cvEnabled)
+	{
+		g_bPluginEnabled = GetConVarBool(convar);
+		if (!g_bPluginEnabled)
+		{
+			for (int client = 1; client <= MaxClients; client++)
+			{
+				if (!IsClientInGame(client))
+					continue;
+				OnClientDisconnect(client);
+			}
+		}
+	}
+	else if (convar == g_cvSvGravity)
 		g_iSvGravity = GetConVarInt(convar);
 	else if (convar == g_cvSvAutoBhop && g_cvSvAutoBhop != null)
 		g_bSvAutoBhop = GetConVarBool(convar);
@@ -261,7 +279,7 @@ public void OnClientDisconnect(int client)
 
 public Action OnPlayerRunCmd(int client, int &buttons)
 {
-	if (g_bSvAutoBhop || !IsClientInGame(client) || IsFakeClient(client) || !IsPlayerAlive(client) || IsClientSourceTV(client))
+	if (!g_bPluginEnabled ||g_bSvAutoBhop || !IsClientInGame(client) || IsFakeClient(client) || !IsPlayerAlive(client) || IsClientSourceTV(client))
 		return Plugin_Continue;
 
 	g_iButtons[client] = buttons;
@@ -270,7 +288,7 @@ public Action OnPlayerRunCmd(int client, int &buttons)
 
 public void OnPlayerRunCmdPost(int client, int buttons, int impulse, const float vel[3], const float angles[3], int weapon, int subtype, int cmdnum, int tickcount, int seed, const int mouse[2])
 {
-	if (g_bSvAutoBhop || g_iSvGravity != 800 || !IsClientInGame(client) || IsFakeClient(client) || !IsPlayerAlive(client) || IsClientSourceTV(client))
+	if (!g_bPluginEnabled || g_bSvAutoBhop || g_iSvGravity != 800 || !IsClientInGame(client) || IsFakeClient(client) || !IsPlayerAlive(client) || IsClientSourceTV(client))
 		return;
 
 	float fVecVelocity[3];
