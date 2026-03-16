@@ -23,8 +23,6 @@ enum struct CPlayer
 		this.iHackJumps = 0;
 		this.aJumps =  { 0, 0, 0 };
 		
-		this.hStreak.Reset();
-		
 		CStreak hStreak;
 		for(int i = 0; i < this.hStreaks.Length; i++)
 		{
@@ -32,6 +30,7 @@ enum struct CPlayer
 			hStreak.Reset();
 		}
 
+		this.hStreak.Reset();
 		delete this.hStreaks;
 	}
 }

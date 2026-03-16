@@ -439,14 +439,14 @@ void OnPressJump(int client, int iTick, float fVelocity, bool bLeaveGround)
 					CurStreak.iEndTick = iTick;
 
 					DoStats(client, CurStreak, hJump);
-					hJumps.SetArray(iLength - 1, hJump, sizeof(CJump))
+					hJumps.SetArray(iLength - 1, hJump, sizeof(CJump));
 				}
 				else
 					CurStreak.Reset();
 
 				CStreak newStreak;
 				CurStreak = newStreak;
-				CurStreak.hJumps = new ArrayList(1);
+				CurStreak.hJumps = new ArrayList(sizeof(CJump));
 
 				g_aPlayers[client].hStreak = CurStreak;
 				hJumps = CurStreak.hJumps;
@@ -946,7 +946,7 @@ void Forward_OnDetected(int client, const char[] reason, const char[] stats)
 
 stock void InitPlayerData(int client)
 {
-	g_aPlayers[client].hStreaks = new ArrayList(1);
+	g_aPlayers[client].hStreaks = new ArrayList(sizeof(CStreak));
 	ResetValues(client);
 }
 

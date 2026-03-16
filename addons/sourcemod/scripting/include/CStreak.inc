@@ -20,6 +20,17 @@ enum struct CStreak
 	
 	void Reset()
 	{
+		this.bValid = false;
+		this.iStartTick = -1;
+		this.iEndTick = -1;
+		this.fStartVel = 0.0
+		this.fEndVel = 0.0;
+		
+		this.iJumps = 0;
+		this.iHyperJumps = 0;
+		this.iHackJumps = 0;
+		this.aJumps =  { 0, 0, 0 };
+
 		for(int i = 0; i < this.hJumps.Length; i++)
 		{
 			CJump hJump;
