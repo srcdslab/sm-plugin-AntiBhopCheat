@@ -23,7 +23,7 @@ enum struct CStreak
 		this.bValid = false;
 		this.iStartTick = -1;
 		this.iEndTick = -1;
-		this.fStartVel = 0.0
+		this.fStartVel = 0.0;
 		this.fEndVel = 0.0;
 		
 		this.iJumps = 0;

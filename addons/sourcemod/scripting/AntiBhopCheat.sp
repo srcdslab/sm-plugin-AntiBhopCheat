@@ -381,6 +381,7 @@ void OnTouchGround(int client, int iTick, float fVelocity)
 	if (iLength == VALID_MIN_JUMPS)
 	{
 		CurStreak.bValid = true;
+		g_aPlayers[client].hStreak.bValid = true;
 
 		// Current streak is valid, push onto hStreaks ArrayList
 		ArrayList hStreaks = g_aPlayers[client].hStreaks;
@@ -427,6 +428,9 @@ void OnTouchGround(int client, int iTick, float fVelocity)
 void OnPressJump(int client, int iTick, float fVelocity, bool bLeaveGround)
 {
 	//PrintToChatAll("%d : %f - OnPressJump %d", iTick, fVelocity, bLeaveGround);
+
+	if (g_aPlayers[client].hStreak.hJumps == null)
+		g_aPlayers[client].hStreak.hJumps = new ArrayList(sizeof(CJump));
 
 	CStreak CurStreak; 
 	CurStreak = g_aPlayers[client].hStreak;
@@ -958,6 +962,7 @@ void Forward_OnDetected(int client, const char[] reason, const char[] stats)
 stock void InitPlayerData(int client)
 {
 	g_aPlayers[client].hStreaks = new ArrayList(sizeof(CStreak));
+	g_aPlayers[client].hStreak.hJumps = new ArrayList(sizeof(CJump));
 	ResetValues(client);
 }
 
