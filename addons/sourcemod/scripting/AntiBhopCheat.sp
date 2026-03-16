@@ -455,6 +455,7 @@ void OnPressJump(int client, int iTick, float fVelocity, bool bLeaveGround)
 			{
 				iPrevJump = iTick - hJump.iEndTick;
 				hJump.iNextJump = iPrevJump;
+				hJumps.SetArray(iLength - 1, hJump, sizeof(CJump));
 			}
 		}
 
