@@ -392,6 +392,17 @@ void OnTouchGround(int client, int iTick, float fVelocity)
 			hStreak.Reset();
 			hStreaks.Erase(0);
 		}
+
+		// Deep-copy the jump list so history does not share handles with the active streak
+		ArrayList hJumpsCopy = new ArrayList(sizeof(CJump));
+		for (int j = 0; j < iLength; j++)
+		{
+			CJump tmpJump;
+			hJumps.GetArray(j, tmpJump, sizeof(CJump));
+			hJumpsCopy.PushArray(tmpJump, sizeof(CJump));
+		}
+		CurStreak.hJumps = hJumpsCopy;
+
 		hStreaks.PushArray(CurStreak);
 
 		for (int i = 0; i < iLength - 1; i++)
