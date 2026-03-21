@@ -191,7 +191,7 @@ public void OnConfigsExecuted()
 	g_fGlobalHyper = g_cvGlobalHyper.FloatValue;
 	g_fGlobalHack = g_cvGlobalHack.FloatValue;
 	g_bGlobalHackKick = g_cvGlobalHackKick.BoolValue;
-	
+
 #if defined _SelectiveBhop_Included
 	g_bCurrentStreakHyperLimited = g_cvCurrentStreakLimitBhop.BoolValue;
 	g_bCurrentHackHyperLimited = g_cvCurrentHackLimitBhop.BoolValue;
@@ -352,7 +352,7 @@ public void OnPlayerRunCmdPost(int client, int buttons, int impulse, const float
 		if (bPrevHoldingJump)
 		{
 			g_bHoldingJump[client] = false;
-			OnReleaseJump(client, tickcount, fVelocity);
+			OnReleaseJump(client, tickcount);
 		}
 	}
 }
@@ -367,61 +367,110 @@ void OnTouchGround(int client, int iTick, float fVelocity)
 	CurStreak = g_aPlayers[client].hStreak;
 
 	ArrayList hJumps = CurStreak.hJumps;
-	
+
 	int iLength = hJumps.Length;
 
-	CJump hJump; 
+	CJump hJump;
 	hJumps.GetArray(iLength - 1, hJump, sizeof(CJump));
 
 	hJump.iEndTick = iTick;
 	hJump.fEndVel = fVelocity;
-	
+
 	hJumps.SetArray(iLength - 1, hJump, sizeof(CJump));
 
 	if (iLength == VALID_MIN_JUMPS)
 	{
-		CurStreak.bValid = true;
 		g_aPlayers[client].hStreak.bValid = true;
 
-		// Current streak is valid, push onto hStreaks ArrayList
-		ArrayList hStreaks = g_aPlayers[client].hStreaks;
-		if (hStreaks.Length == MAX_STREAKS)
-		{
-			// Keep the last 10 streaks
-			CStreak hStreak; 
-			hStreaks.GetArray(0, hStreak, sizeof(CStreak));
-			hStreak.Reset();
-			hStreaks.Erase(0);
-		}
-
-		// Deep-copy the jump list so history does not share handles with the active streak
-		ArrayList hJumpsCopy = new ArrayList(sizeof(CJump));
-		for (int j = 0; j < iLength; j++)
-		{
-			CJump tmpJump;
-			hJumps.GetArray(j, tmpJump, sizeof(CJump));
-			hJumpsCopy.PushArray(tmpJump, sizeof(CJump));
-		}
-		CurStreak.hJumps = hJumpsCopy;
-
-		hStreaks.PushArray(CurStreak);
-
+		// Run DoStats first so that counters are populated before we snapshot the streak.
 		for (int i = 0; i < iLength - 1; i++)
 		{
 			CJump hJump_;
 			hJumps.GetArray(i, hJump_, sizeof(CJump));
 
-			DoStats(client, CurStreak, hJump_);
+			DoStats(client, hJump_);
 			hJumps.SetArray(i, hJump_, sizeof(CJump));
 		}
+
+		// Current streak is valid — push a snapshot onto hStreaks.
+		ArrayList hStreaks = g_aPlayers[client].hStreaks;
+		if (hStreaks.Length == MAX_STREAKS)
+		{
+			// Keep the last 10 streaks
+			CStreak hStreak;
+			hStreaks.GetArray(0, hStreak, sizeof(CStreak));
+			hStreak.Reset();
+			hStreaks.Erase(0);
+		}
+
+		// Deep-copy the jump list so the snapshot does not share handles with the active streak.
+		// Each CJump's hPresses is also deep-copied so that cleanup of both the active streak
+		// and the snapshot never double-deletes the same handle.
+		ArrayList hJumpsCopy = new ArrayList(sizeof(CJump));
+		for (int j = 0; j < iLength; j++)
+		{
+			CJump tmpJump;
+			hJumps.GetArray(j, tmpJump, sizeof(CJump));
+			tmpJump.hPresses = DeepCopyPresses(tmpJump.hPresses);
+			hJumpsCopy.PushArray(tmpJump, sizeof(CJump));
+		}
+
+		// Snapshot the now-updated streak (iJumps etc. are correct).
+		CStreak snapshotStreak;
+		snapshotStreak = g_aPlayers[client].hStreak;
+		snapshotStreak.hJumps = hJumpsCopy;
+		hStreaks.PushArray(snapshotStreak);
 	}
 	else if (iLength > VALID_MIN_JUMPS)
 	{
+		int iJumpIndex = hJumps.Length - 2;
 		CJump hJump_;
-		hJumps.GetArray(hJumps.Length - 2, hJump_, sizeof(CJump));
+		hJumps.GetArray(iJumpIndex, hJump_, sizeof(CJump));
 
-		DoStats(client, CurStreak, hJump_);
-		hJumps.SetArray(hJumps.Length - 2, hJump_, sizeof(CJump));
+		DoStats(client, hJump_);
+		hJumps.SetArray(iJumpIndex, hJump_, sizeof(CJump));
+
+		// Keep the stored snapshot in hStreaks up-to-date with the latest counters
+		// and the newly processed jump.
+		ArrayList hStreaks = g_aPlayers[client].hStreaks;
+		if (hStreaks.Length > 0)
+		{
+			CStreak storedStreak;
+			hStreaks.GetArray(hStreaks.Length - 1, storedStreak, sizeof(CStreak));
+
+			storedStreak.iJumps      = g_aPlayers[client].hStreak.iJumps;
+			storedStreak.iHyperJumps = g_aPlayers[client].hStreak.iHyperJumps;
+			storedStreak.iHackJumps  = g_aPlayers[client].hStreak.iHackJumps;
+			storedStreak.aJumps[0]   = g_aPlayers[client].hStreak.aJumps[0];
+			storedStreak.aJumps[1]   = g_aPlayers[client].hStreak.aJumps[1];
+			storedStreak.aJumps[2]   = g_aPlayers[client].hStreak.aJumps[2];
+
+			// The initial deep-copy captured iLength==VALID_MIN_JUMPS entries; for the
+			// entry at iJumpIndex its iNextJump was unknown at copy time — update it now.
+			// For any later jump (iJumpIndex >= stored length) simply append it.
+			int iStoredLen = storedStreak.hJumps.Length;
+			if (iJumpIndex < iStoredLen)
+			{
+				// Update only scalar fields so we do not replace the snapshot's own
+				// deep-copied hPresses handle with the active streak's handle.
+				CJump snapshotJump;
+				storedStreak.hJumps.GetArray(iJumpIndex, snapshotJump, sizeof(CJump));
+				snapshotJump.iNextJump = hJump_.iNextJump;
+				snapshotJump.iEndTick  = hJump_.iEndTick;
+				snapshotJump.fEndVel   = hJump_.fEndVel;
+				storedStreak.hJumps.SetArray(iJumpIndex, snapshotJump, sizeof(CJump));
+			}
+			else
+			{
+				// New jump: deep-copy hPresses so the snapshot owns an independent handle.
+				CJump snapshotJump;
+				hJumps.GetArray(iJumpIndex, snapshotJump, sizeof(CJump));
+				snapshotJump.hPresses = DeepCopyPresses(hJump_.hPresses);
+				storedStreak.hJumps.PushArray(snapshotJump, sizeof(CJump));
+			}
+
+			hStreaks.SetArray(hStreaks.Length - 1, storedStreak, sizeof(CStreak));
+		}
 	}
 }
 
@@ -432,7 +481,7 @@ void OnPressJump(int client, int iTick, float fVelocity, bool bLeaveGround)
 	if (g_aPlayers[client].hStreak.hJumps == null)
 		g_aPlayers[client].hStreak.hJumps = new ArrayList(sizeof(CJump));
 
-	CStreak CurStreak; 
+	CStreak CurStreak;
 	CurStreak = g_aPlayers[client].hStreak;
 	ArrayList hJumps = CurStreak.hJumps;
 	CJump hJump;
@@ -449,15 +498,67 @@ void OnPressJump(int client, int iTick, float fVelocity, bool bLeaveGround)
 			hJumps.GetArray(iLength - 1, hJump, sizeof(CJump));
 			if (hJump.iEndTick < iTick - VALID_MAX_TICKS || fVelocity < VALID_MIN_VELOCITY)
 			{
-				if ( CurStreak.bValid)
+				if (CurStreak.bValid)
 				{
 					CurStreak.iEndTick = iTick;
 
-					DoStats(client, CurStreak, hJump);
+					DoStats(client, hJump);
 					hJumps.SetArray(iLength - 1, hJump, sizeof(CJump));
+
+					// Sync the stored snapshot before the streak is reset so the final
+					// jump and updated counters are visible in sm_streak history.
+					ArrayList hStreaks = g_aPlayers[client].hStreaks;
+					if (hStreaks.Length > 0)
+					{
+						CStreak storedStreak;
+						hStreaks.GetArray(hStreaks.Length - 1, storedStreak, sizeof(CStreak));
+
+						storedStreak.iJumps      = g_aPlayers[client].hStreak.iJumps;
+						storedStreak.iHyperJumps = g_aPlayers[client].hStreak.iHyperJumps;
+						storedStreak.iHackJumps  = g_aPlayers[client].hStreak.iHackJumps;
+						storedStreak.aJumps[0]   = g_aPlayers[client].hStreak.aJumps[0];
+						storedStreak.aJumps[1]   = g_aPlayers[client].hStreak.aJumps[1];
+						storedStreak.aJumps[2]   = g_aPlayers[client].hStreak.aJumps[2];
+						storedStreak.iEndTick    = iTick;
+
+						int iJumpIdx   = iLength - 1;
+						int iStoredLen = storedStreak.hJumps.Length;
+						if (iJumpIdx < iStoredLen)
+						{
+							// Update only scalar fields; preserve the snapshot's own deep-copied hPresses.
+							CJump snapshotJump;
+							storedStreak.hJumps.GetArray(iJumpIdx, snapshotJump, sizeof(CJump));
+							snapshotJump.iNextJump = hJump.iNextJump;
+							snapshotJump.iEndTick  = hJump.iEndTick;
+							snapshotJump.fEndVel   = hJump.fEndVel;
+							storedStreak.hJumps.SetArray(iJumpIdx, snapshotJump, sizeof(CJump));
+						}
+						else
+						{
+							// New jump: deep-copy hPresses so the snapshot owns an independent handle.
+							CJump snapshotJump;
+							hJumps.GetArray(iLength - 1, snapshotJump, sizeof(CJump));
+							snapshotJump.hPresses = DeepCopyPresses(hJump.hPresses);
+							storedStreak.hJumps.PushArray(snapshotJump, sizeof(CJump));
+						}
+
+						hStreaks.SetArray(hStreaks.Length - 1, storedStreak, sizeof(CStreak));
+					}
+
+					// Free each CJump's hPresses before deleting the container.
+					// delete on an ArrayList only frees the list structure itself —
+					// the hPresses handles stored as integers inside are NOT closed
+					// automatically and would be permanently leaked.
+					for (int i = 0; i < hJumps.Length; i++)
+					{
+						CJump cleanJump;
+						hJumps.GetArray(i, cleanJump, sizeof(CJump));
+						delete cleanJump.hPresses;
+					}
+					delete hJumps;
 				}
 				else
-					CurStreak.Reset();
+					CurStreak.Reset();  // handles hPresses cleanup via CJump.Reset()
 
 				CStreak newStreak;
 				CurStreak = newStreak;
@@ -491,15 +592,13 @@ void OnPressJump(int client, int iTick, float fVelocity, bool bLeaveGround)
 	hPresses.Push(iTick);
 }
 
-void OnReleaseJump(int client, int iTick, float fVelocity)
+void OnReleaseJump(int client, int iTick)
 {
-	//PrintToChatAll("%d : %f - OnReleaseJump", iTick, fVelocity);
-
-	CStreak CurStreak; 
+	CStreak CurStreak;
 	CurStreak = g_aPlayers[client].hStreak;
 	ArrayList hJumps = CurStreak.hJumps;
 
-	CJump hJump; 
+	CJump hJump;
 	hJumps.GetArray(hJumps.Length - 1, hJump, sizeof(CJump));
 
 	ArrayList hPresses = hJump.hPresses;
@@ -507,14 +606,16 @@ void OnReleaseJump(int client, int iTick, float fVelocity)
 	hPresses.Set(hPresses.Length - 1, iTick, 1);
 }
 
-void DoStats(int client, CStreak CurStreak, CJump hJump)
+void DoStats(int client, CJump hJump)
 {
 	int aJumps[3] = {0, 0, 0};
 	int iPresses = 0;
 	int iTicks = 0;
 	int iLastJunk = 0;
 
-	CurStreak.iJumps++;
+	// Write directly to g_aPlayers[client].hStreak — CStreak is an enum struct and is
+	// always passed by value, so mutations to the local CurStreak copy are discarded.
+	g_aPlayers[client].hStreak.iJumps++;
 	g_aPlayers[client].iJumps++;
 
 	ArrayList hPresses = hJump.hPresses;
@@ -539,13 +640,13 @@ void DoStats(int client, CStreak CurStreak, CJump hJump)
 	float PressesPerTick = (iPresses * 4.0) / float(iTicks);
 	if (PressesPerTick >= 0.85)
 	{
-		CurStreak.iHyperJumps++;
+		g_aPlayers[client].hStreak.iHyperJumps++;
 		g_aPlayers[client].iHyperJumps++;
 	}
 
 	if (iNextJump != -1 && iNextJump <= 1 && (iLastJunk > 5 || iPresses <= 2) && hJump.fEndVel >= 285.0)
 	{
-		CurStreak.iHackJumps++;
+		g_aPlayers[client].hStreak.iHackJumps++;
 		g_aPlayers[client].iHackJumps++;
 	}
 
@@ -553,17 +654,17 @@ void DoStats(int client, CStreak CurStreak, CJump hJump)
 	g_aPlayers[client].aJumps[1] += aJumps[1];
 	g_aPlayers[client].aJumps[2] += aJumps[2];
 
-	CurStreak.aJumps[0] += aJumps[0];
-	CurStreak.aJumps[1] += aJumps[1];
-	CurStreak.aJumps[2] += aJumps[2];
+	g_aPlayers[client].hStreak.aJumps[0] += aJumps[0];
+	g_aPlayers[client].hStreak.aJumps[1] += aJumps[1];
+	g_aPlayers[client].hStreak.aJumps[2] += aJumps[2];
 
-	int iStreakJumps = CurStreak.iJumps;
+	int iStreakJumps = g_aPlayers[client].hStreak.iJumps;
 	int iGlobalJumps = g_aPlayers[client].iJumps;
 
 	if (iStreakJumps >= g_iCurrentJumps)
 	{
-		float HackRatio = CurStreak.iHackJumps / float(iStreakJumps);
-		float HyperRatio = CurStreak.iHyperJumps / float(iStreakJumps);
+		float HackRatio = g_aPlayers[client].hStreak.iHackJumps / float(iStreakJumps);
+		float HyperRatio = g_aPlayers[client].hStreak.iHyperJumps / float(iStreakJumps);
 
 		if (HackRatio >= g_fCurrentHack && g_fCurrentHack > 0.0)
 		{
@@ -631,7 +732,7 @@ void HandleFlagging(int client, const char[] reason)
 			bool bLimitBhop = CanTestFeatures() && GetFeatureStatus(FeatureType_Native, "LimitBhop") == FeatureStatus_Available;
 
 			if (g_Plugin_SelectiveBhop && bLimitBhop && bIsBhopLimited && !IsBhopLimited(client) &&
-				(strcmp(reason, STREAK_HYPER, false) == 0 && g_bCurrentStreakHyperLimited || strcmp(reason, GLOBAL_HYPER, false) == 0 && g_bGlobalStreakHyperLimited || 
+				(strcmp(reason, STREAK_HYPER, false) == 0 && g_bCurrentStreakHyperLimited || strcmp(reason, GLOBAL_HYPER, false) == 0 && g_bGlobalStreakHyperLimited ||
 				strcmp(reason, STREAK_HACK, false) == 0 && g_bCurrentHackHyperLimited || strcmp(reason ,GLOBAL_HACK, false) == 0 && g_bGlobalHackHyperLimited))
 			{
 				LimitBhop(client, true);
@@ -676,12 +777,15 @@ void NotifyAdmins(int client, const char[] sReason, bHighSus = false, bLimitBhop
 	}
 
 	// Fully reset player stats. We want to analyse a new whole streak.
-	CreateTimer(0.3, Timer_OnDetected, client, TIMER_FLAG_NO_MAPCHANGE);
+	// Pass the UserID (not the client index) so the timer is safe if the player
+	// disconnects before the 0.3 s fires.
+	CreateTimer(0.3, Timer_OnDetected, GetClientUserId(client), TIMER_FLAG_NO_MAPCHANGE);
 }
 
-public Action Timer_OnDetected(Handle timer, any client)
+public Action Timer_OnDetected(Handle timer, int userid)
 {
-	if (!client)
+	int client = GetClientOfUserId(userid);
+	if (!client || !IsClientInGame(client))
 		return Plugin_Stop;
 
 	ResetPlayerData(client);
@@ -789,7 +893,7 @@ void PrintStreak(int client, int iTarget, int iStreak, bool bDetected=false)
 		g_sStats, iStreak, iTarget);
 
 	ArrayList hStreaks = g_aPlayers[iTarget].hStreaks;
-	CStreak hStreak; 
+	CStreak hStreak;
 	hStreak = g_aPlayers[iTarget].hStreak;
 	int iStreaks = hStreaks.Length;
 
@@ -853,7 +957,7 @@ void PrintStreak(int client, int iTarget, int iStreak, bool bDetected=false)
 
 	for (int i = 0; i < hJumps.Length; i++)
 	{
-		CJump hJump; 
+		CJump hJump;
 		hJumps.GetArray(i, hJump, sizeof(CJump));
 		ArrayList hPresses = hJump.hPresses;
 
@@ -971,6 +1075,21 @@ stock void ResetValues(int client)
 	g_bOnGround[client] = false;
 	g_bHoldingJump[client] = false;
 	g_bInJump[client] = false;
+}
+
+// Creates an independent deep copy of a CJump's hPresses ArrayList so that the
+// snapshot and the active streak never share the same handle.
+stock ArrayList DeepCopyPresses(ArrayList hPresses)
+{
+	ArrayList hCopy = new ArrayList(2);
+	int iLen = hPresses.Length;
+	for (int i = 0; i < iLen; i++)
+	{
+		int aPress[2];
+		hPresses.GetArray(i, aPress, 2);
+		hCopy.PushArray(aPress, 2);
+	}
+	return hCopy;
 }
 
 stock void ResetPlayerData(int client)
