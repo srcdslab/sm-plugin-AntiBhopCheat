@@ -561,6 +561,7 @@ void OnPressJump(int client, int iTick, float fVelocity, bool bLeaveGround)
 					CurStreak.Reset();  // handles hPresses cleanup via CJump.Reset()
 
 				CStreak newStreak;
+				newStreak.Reset();
 				CurStreak = newStreak;
 				CurStreak.hJumps = new ArrayList(sizeof(CJump));
 
