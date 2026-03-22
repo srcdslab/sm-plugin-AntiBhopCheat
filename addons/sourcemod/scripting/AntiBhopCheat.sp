@@ -576,6 +576,7 @@ void OnPressJump(int client, int iTick, float fVelocity, bool bLeaveGround)
 		}
 
 		CJump newJump;
+		newJump.Reset();
 		hJump = newJump;
 		hJump.hPresses = new ArrayList(2);
 
