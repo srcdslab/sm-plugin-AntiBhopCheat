@@ -13,8 +13,9 @@ enum struct CJump
 	int iPrevJump;
 	int iNextJump;
 	
-	ArrayList hPresses;
-	
+	int iPresses[MAX_PRESSES];
+	int iCurrentPress;
+
 	void Reset()
 	{
 		this.iStartTick = -1;
@@ -25,6 +26,7 @@ enum struct CJump
 		this.iPrevJump = -1;
 		this.iNextJump = -1;
 
-		delete this.hPresses;
+		for (int i = 0; i < MAX_PRESSES; i++)
+			this.iPresses[i] = -1;
 	}
 }
