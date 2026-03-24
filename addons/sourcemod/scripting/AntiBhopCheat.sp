@@ -443,6 +443,7 @@ void OnPressJump(int client, int iTick, float fVelocity, bool bLeaveGround)
 	CJump hJump;
 
 	int iLength = hJumps.Length;
+	int iJumpIndex = 0;
 
 	if (bLeaveGround)
 	{
@@ -451,7 +452,8 @@ void OnPressJump(int client, int iTick, float fVelocity, bool bLeaveGround)
 		if (iLength)
 		{
 			// Last jump was more than VALID_MAX_TICKS ticks ago or not valid and fVelocity < VALID_MIN_VELOCITY
-			hJumps.GetArray(iLength - 1, hJump, sizeof(CJump));
+			iJumpIndex = iLength - 1;
+			hJumps.GetArray(iJumpIndex, hJump, sizeof(CJump));
 			if (hJump.iEndTick < iTick - VALID_MAX_TICKS || fVelocity < VALID_MIN_VELOCITY)
 			{
 				if (CurStreak.bValid)
@@ -488,18 +490,22 @@ void OnPressJump(int client, int iTick, float fVelocity, bool bLeaveGround)
 		hJump.fStartVel = fVelocity;
 		if (iPrevJump != -1)
 			hJump.iPrevJump = iPrevJump;
-		hJumps.PushArray(hJump);
+		iJumpIndex = hJumps.PushArray(hJump);
 	}
 	else
-		hJumps.GetArray(iLength - 1, hJump, sizeof(CJump));
+	{
+		iJumpIndex = iLength - 1;
+		hJumps.GetArray(iJumpIndex, hJump, sizeof(CJump));
+	}
 
 	if (hJump.iCurrentPress >= MAX_PRESSES)
 	{
 		hJump.iCurrentPress = 0;
-		hJumps.SetArray(iLength - 1, hJump, sizeof(hJump));
+		hJumps.SetArray(iJumpIndex, hJump, sizeof(hJump));
 	}
 
 	hJump.iPresses[hJump.iCurrentPress++] = iTick;
+	hJumps.SetArray(iJumpIndex, hJump, sizeof(hJump));
 }
 
 void OnReleaseJump(int client, int iTick)
