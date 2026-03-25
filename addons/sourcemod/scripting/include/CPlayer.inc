@@ -21,16 +21,19 @@ enum struct CPlayer
 		this.iJumps = 0;
 		this.iHyperJumps = 0;
 		this.iHackJumps = 0;
-		this.aJumps =  { 0, 0, 0 };
-		
-		CStreak hStreak;
-		for(int i = 0; i < this.hStreaks.Length; i++)
+		this.aJumps = { 0, 0, 0 };
+
+		if (this.hStreaks != null)
 		{
-			this.hStreaks.GetArray(i, hStreak, sizeof(CStreak));
-			hStreak.Reset();
+			CStreak hStreak;
+			for (int i = 0; i < this.hStreaks.Length; i++)
+			{
+				this.hStreaks.GetArray(i, hStreak, sizeof(CStreak));
+				hStreak.Reset();
+			}
+			delete this.hStreaks;
 		}
 
 		this.hStreak.Reset();
-		delete this.hStreaks;
 	}
 }
