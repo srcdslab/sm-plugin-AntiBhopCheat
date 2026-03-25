@@ -29,15 +29,17 @@ enum struct CStreak
 		this.iJumps = 0;
 		this.iHyperJumps = 0;
 		this.iHackJumps = 0;
-		this.aJumps =  { 0, 0, 0 };
+		this.aJumps = { 0, 0, 0 };
 
-		for(int i = 0; i < this.hJumps.Length; i++)
+		if (this.hJumps != null)
 		{
-			CJump hJump;
-			this.hJumps.GetArray(i, hJump, sizeof(CJump));
-			hJump.Reset();
+			for (int i = 0; i < this.hJumps.Length; i++)
+			{
+				CJump hJump;
+				this.hJumps.GetArray(i, hJump, sizeof(CJump));
+				hJump.Reset();
+			}
+			delete this.hJumps;
 		}
-
-		delete this.hJumps;
 	}
 }
