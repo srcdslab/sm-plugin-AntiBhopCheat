@@ -15,19 +15,19 @@ This repository contains **AntiBhopCheat**, a SourcePawn plugin for SourceMod th
 
 ### Language & Platform
 - **Language**: SourcePawn (modern syntax with methodmaps)
-- **Platform**: SourceMod 1.11.0+ (uses latest stable release)
-- **Compiler**: SourcePawn compiler (spcomp) via SourceKnight
+- **Platform**: SourceMod 1.12.x
+- **Compiler**: SourcePawn compiler (spcomp), installed via `rumblefrog/setup-sp` in CI
 - **Target Games**: Source engine games (CS:S, CS:GO, TF2, etc.)
 
 ### Build System
-- **Primary Tool**: SourceKnight (automated build system)
-- **Configuration**: `sourceknight.yaml` defines dependencies and build targets
+- **Primary Tool**: Native GitHub Actions workflow (no external build tool)
+- **Configuration**: Dependencies and build steps are defined directly in `.github/workflows/ci.yml`
 - **CI/CD**: GitHub Actions workflow (`.github/workflows/ci.yml`)
 - **Artifacts**: Automatic packaging and release creation
 
 ### Dependencies
-The plugin has several managed dependencies (defined in `sourceknight.yaml`):
-- **SourceMod**: Core framework (1.11.0-git6934)
+The plugin has several managed dependencies (cloned directly in `.github/workflows/ci.yml`):
+- **SourceMod**: Core framework (1.12.x)
 - **MultiColors**: For colored chat messages
 - **SelectiveBhop**: Optional integration for bhop limiting
 - **Basic**: Utility methodmap base class
@@ -86,11 +86,12 @@ addons/sourcemod/scripting/
 
 ### Building the Plugin
 ```bash
-# Automatic build via SourceKnight (recommended)
-# Triggered by GitHub Actions on push/PR
+# Automatic build via GitHub Actions (recommended)
+# Triggered by GitHub Actions on push/PR, see .github/workflows/ci.yml
 
-# Local development (if SourceKnight is available)
-sourceknight build
+# Local development: install spcomp (SourceMod 1.12.x) and the include
+# files from the dependencies listed in .github/workflows/ci.yml, then:
+spcomp -i addons/sourcemod/scripting/include -o AntiBhopCheat.smx addons/sourcemod/scripting/AntiBhopCheat.sp
 ```
 
 ### Testing Procedures
