@@ -70,7 +70,7 @@ public Plugin myinfo =
 	name			= "AntiBhopCheat",
 	author			= "BotoX, .Rushaway",
 	description		= "Detect all kinds of bhop cheats",
-	version			= "1.9.0",
+	version			= "1.9.1",
 	url				= ""
 };
 
@@ -293,7 +293,26 @@ public Action OnPlayerRunCmd(int client, int &buttons)
 
 public void OnPlayerRunCmdPost(int client, int buttons, int impulse, const float vel[3], const float angles[3], int weapon, int subtype, int cmdnum, int tickcount, int seed, const int mouse[2])
 {
-	if (!g_bPluginEnabled || g_bSvAutoBhop || g_iSvGravity != 800 || !IsClientInGame(client) || IsFakeClient(client) || !IsPlayerAlive(client) || IsClientSourceTV(client))
+	if (!g_bPluginEnabled || g_bSvAutoBhop || g_iSvGravity != 800 || !IsClientInGame(client) || IsFakeClient(client) || !IsPlayerAlive(client))
+		return;
+
+	bool bPrevOnGround = g_bOnGround[client];
+	bool bInWater = GetEntProp(client, Prop_Send, "m_nWaterLevel") >= 2;
+	bool bOnGround = !bInWater && GetEntityFlags(client) & FL_ONGROUND;
+	bool bPrevHoldingJump = g_bHoldingJump[client];
+	bool bHoldingJump = (g_iButtons[client] & IN_JUMP) != 0;
+	bool bInJump = g_bInJump[client];
+
+	if (bInJump)
+	{
+		MoveType ClientMoveType = GetEntityMoveType(client);
+		if ((bInWater || ClientMoveType == MOVETYPE_LADDER || ClientMoveType == MOVETYPE_NOCLIP) && GetEntityGravity(client) == 0.0)
+			bOnGround = true;
+	}
+
+	// Nothing below changes unless the ground or jump state changed,
+	// so skip the velocity lookup on the (vast majority of) ticks where neither did.
+	if (bOnGround == bPrevOnGround && bHoldingJump == bPrevHoldingJump)
 		return;
 
 	float fVecVelocity[3];
@@ -305,21 +324,9 @@ public void OnPlayerRunCmdPost(int client, int buttons, int impulse, const float
 	if (fVelocity > 700.0)
 		return;
 
-	MoveType ClientMoveType = GetEntityMoveType(client);
-
-	bool bPrevOnGround = g_bOnGround[client];
-	bool bInWater = GetEntProp(client, Prop_Send, "m_nWaterLevel") >= 2;
-	bool bOnGround = !bInWater && GetEntityFlags(client) & FL_ONGROUND;
-	bool bPrevHoldingJump = g_bHoldingJump[client];
-	bool bHoldingJump = view_as<bool>(g_iButtons[client] & IN_JUMP);
-	bool bInJump = g_bInJump[client];
-
-	if (bInJump && (bInWater || ClientMoveType == MOVETYPE_LADDER || ClientMoveType == MOVETYPE_NOCLIP) && GetEntityGravity(client) == 0.0)
-		bOnGround = true;
-
 	// Debug with PrinToChatAll
 	// PrintToChatAll("bInJump = %s", bInJump ? "true" : "false");
-	// PrintToChatAll("ClientMoveType = %d", ClientMoveType);
+	// PrintToChatAll("ClientMoveType = %d", GetEntityMoveType(client));
 	// PrintToChatAll("GetEntityGravity(client) = %f", GetEntityGravity(client));
 	// PrintToChatAll("g_iSvGravity = %d", g_iSvGravity);
 	// PrintToChatAll("bInWater = %d", bInWater);
