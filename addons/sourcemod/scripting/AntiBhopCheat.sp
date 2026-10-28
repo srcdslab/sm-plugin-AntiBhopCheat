@@ -31,6 +31,7 @@ ConVar g_cvGlobalJumps, g_cvGlobalHyper, g_cvGlobalHack, g_cvGlobalHackKick;
 ConVar g_cvCurrentStreakLimitBhop, g_cvGlobalStreakLimitBhop, g_cvCurrentHackLimitBhop, g_cvGlobalHackLimitBhop;
 #endif
 
+// 1993 = 2000 (Discord message limit) - 6 (``` code block) - 1, see AntiBhopCheat-discord
 char g_sStats[1993], g_sBeepSound[PLATFORM_MAX_PATH];
 
 float g_fCurrentHyper
@@ -42,6 +43,7 @@ bool g_bOnGround[MAXPLAYERS + 1]
 	, g_bHoldingJump[MAXPLAYERS + 1]
 	, g_bInJump[MAXPLAYERS + 1]
 	, g_bFlagged[MAXPLAYERS + 1] = { false, ... }
+	, g_bResetPending[MAXPLAYERS + 1]
 	, g_bCurrentHackKick
 	, g_bGlobalHackKick
 	, g_bCurrentStreakHyperLimited
@@ -70,7 +72,7 @@ public Plugin myinfo =
 	name			= "AntiBhopCheat",
 	author			= "BotoX, .Rushaway",
 	description		= "Detect all kinds of bhop cheats",
-	version			= "1.9.0",
+	version			= "1.10.0",
 	url				= ""
 };
 
@@ -87,11 +89,13 @@ public void OnPluginStart()
 {
 	LoadTranslations("common.phrases");
 
+	gEV_Type = GetEngineVersion();
+
 	g_cvEnabled = CreateConVar("sm_antibhopcheat_enabled", "1", "Enable/Disable AntiBhopCheat plugin [0 = disabled, 1 = enabled]", FCVAR_NOTIFY, true, 0.0, true, 1.0);
 
 	g_cvSvGravity = FindConVar("sv_gravity");
 	g_cvSvAutoBhop = FindConVar("sv_autobunnyhopping");
-	g_cDetectionSound = CreateConVar("sm_antibhopcheat_detection_sound", "1", "Emit a beep sound when someone gets flagged [0 = disabled, 1 = enabled]", 0, true, 0.0, true, 1.0);
+	g_cDetectionSound = CreateConVar("sm_antibhopcheat_detection_sound", "1", "Emit a beep sound when someone gets flagged [0 = disabled, 1 = enabled]", FCVAR_NOTIFY, true, 0.0, true, 1.0);
 	g_cvMaxDetections = CreateConVar("sm_antibhopcheat_max_detection", "2", "When player reach this value start apply punishements.", FCVAR_PROTECTED);
 
 	/* Current Streak */
@@ -143,13 +147,11 @@ public void OnPluginStart()
 
 	if (g_bLate)
 	{
+		// Also the clients still connecting: their OnClientConnected ran before the plugin was loaded.
 		for (int client = 1; client <= MaxClients; client++)
 		{
 			if (IsClientConnected(client))
-			{
-				if (IsClientInGame(client))
-					ResetPlayerData(client);
-			}
+				ResetPlayerData(client);
 		}
 	}
 }
@@ -207,14 +209,15 @@ void OnConVarChanged(ConVar convar, const char[] oldValue, const char[] newValue
 	if (convar == g_cvEnabled)
 	{
 		g_bPluginEnabled = convar.BoolValue;
-		if (!g_bPluginEnabled)
+		for (int client = 1; client <= MaxClients; client++)
 		{
-			for (int client = 1; client <= MaxClients; client++)
-			{
-				if (!IsClientInGame(client))
-					continue;
+			if (!IsClientInGame(client))
+				continue;
+
+			if (!g_bPluginEnabled)
 				OnClientDisconnect(client);
-			}
+			else
+				ResetPlayerData(client);
 		}
 	}
 	else if (convar == g_cvSvGravity)
@@ -280,11 +283,12 @@ public void OnClientDisconnect(int client)
 	ResetValues(client);
 	g_iFlagged[client] = 0;
 	g_bFlagged[client] = false;
+	g_bResetPending[client] = false;
 }
 
 public Action OnPlayerRunCmd(int client, int &buttons)
 {
-	if (!g_bPluginEnabled ||g_bSvAutoBhop || IsFakeClient(client) || !IsPlayerAlive(client))
+	if (!g_bPluginEnabled || g_bSvAutoBhop || IsFakeClient(client) || !IsPlayerAlive(client))
 		return Plugin_Continue;
 
 	g_iButtons[client] = buttons;
@@ -293,7 +297,26 @@ public Action OnPlayerRunCmd(int client, int &buttons)
 
 public void OnPlayerRunCmdPost(int client, int buttons, int impulse, const float vel[3], const float angles[3], int weapon, int subtype, int cmdnum, int tickcount, int seed, const int mouse[2])
 {
-	if (!g_bPluginEnabled || g_bSvAutoBhop || g_iSvGravity != 800 || !IsClientInGame(client) || IsFakeClient(client) || !IsPlayerAlive(client) || IsClientSourceTV(client))
+	if (!g_bPluginEnabled || g_bSvAutoBhop || g_iSvGravity != 800 || !IsClientInGame(client) || IsFakeClient(client) || !IsPlayerAlive(client))
+		return;
+
+	bool bPrevOnGround = g_bOnGround[client];
+	bool bInWater = GetEntProp(client, Prop_Send, "m_nWaterLevel") >= 2;
+	bool bOnGround = !bInWater && (GetEntityFlags(client) & FL_ONGROUND) != 0;
+	bool bPrevHoldingJump = g_bHoldingJump[client];
+	bool bHoldingJump = (g_iButtons[client] & IN_JUMP) != 0;
+	bool bInJump = g_bInJump[client];
+
+	if (bInJump)
+	{
+		MoveType ClientMoveType = GetEntityMoveType(client);
+		if ((bInWater || ClientMoveType == MOVETYPE_LADDER || ClientMoveType == MOVETYPE_NOCLIP) && GetEntityGravity(client) == 0.0)
+			bOnGround = true;
+	}
+
+	// Nothing below changes unless the ground or jump state changed,
+	// so skip the velocity lookup on the (vast majority of) ticks where neither did.
+	if (bOnGround == bPrevOnGround && bHoldingJump == bPrevHoldingJump)
 		return;
 
 	float fVecVelocity[3];
@@ -301,25 +324,9 @@ public void OnPlayerRunCmdPost(int client, int buttons, int impulse, const float
 	fVecVelocity[2] = 0.0;
 	float fVelocity = GetVectorLength(fVecVelocity);
 
-	// With this velocity in 99% the player will be flagged (and can create false positives)
-	if (fVelocity > 700.0)
-		return;
-
-	MoveType ClientMoveType = GetEntityMoveType(client);
-
-	bool bPrevOnGround = g_bOnGround[client];
-	bool bInWater = GetEntProp(client, Prop_Send, "m_nWaterLevel") >= 2;
-	bool bOnGround = !bInWater && GetEntityFlags(client) & FL_ONGROUND;
-	bool bPrevHoldingJump = g_bHoldingJump[client];
-	bool bHoldingJump = view_as<bool>(g_iButtons[client] & IN_JUMP);
-	bool bInJump = g_bInJump[client];
-
-	if (bInJump && (bInWater || ClientMoveType == MOVETYPE_LADDER || ClientMoveType == MOVETYPE_NOCLIP) && GetEntityGravity(client) == 0.0)
-		bOnGround = true;
-
 	// Debug with PrinToChatAll
 	// PrintToChatAll("bInJump = %s", bInJump ? "true" : "false");
-	// PrintToChatAll("ClientMoveType = %d", ClientMoveType);
+	// PrintToChatAll("ClientMoveType = %d", GetEntityMoveType(client));
 	// PrintToChatAll("GetEntityGravity(client) = %f", GetEntityGravity(client));
 	// PrintToChatAll("g_iSvGravity = %d", g_iSvGravity);
 	// PrintToChatAll("bInWater = %d", bInWater);
@@ -369,6 +376,8 @@ void OnTouchGround(int client, int iTick, float fVelocity)
 	CurStreak = g_aPlayers[client].hStreak;
 
 	ArrayList hJumps = CurStreak.hJumps;
+	if (hJumps == null || hJumps.Length == 0)
+		return;
 
 	int iLength = hJumps.Length;
 
@@ -412,13 +421,6 @@ void OnTouchGround(int client, int iTick, float fVelocity)
 		newStreak = g_aPlayers[client].hStreak;
 		newStreak.hJumps = hJumpsCopy;
 		hStreaks.PushArray(newStreak);
-		
-		for (int i = 0; i < iLength - 1; i++)
-		{
-			CJump hJump_;
-			hJumps.GetArray(i, hJump_, sizeof(CJump));
-			DoStats(client, hJump_);
-		}
 	}
 	else if (iLength > VALID_MIN_JUMPS)
 	{
@@ -427,7 +429,35 @@ void OnTouchGround(int client, int iTick, float fVelocity)
 
 		DoStats(client, hJump_);
 		hJumps.SetArray(iLength - 2, hJump_, sizeof(CJump));
+
+		// Keep the latest snapshot in sync with the growing streak.
+		UpdateLatestStreakSnapshot(client);
 	}
+}
+
+// Refresh the most recent snapshot in hStreaks so sm_streak reflects the
+// live streak (jumps + counters) instead of a frozen 3-jump copy.
+void UpdateLatestStreakSnapshot(int client)
+{
+	// Only a valid streak has its snapshot at the end of hStreaks.
+	if (!g_aPlayers[client].hStreak.bValid)
+		return;
+
+	ArrayList hStreaks = g_aPlayers[client].hStreaks;
+	if (hStreaks == null || hStreaks.Length == 0)
+		return;
+
+	int iIndex = hStreaks.Length - 1;
+
+	CStreak hOldSnapshot;
+	hStreaks.GetArray(iIndex, hOldSnapshot, sizeof(CStreak));
+	if (hOldSnapshot.hJumps != null)
+		delete hOldSnapshot.hJumps;
+
+	CStreak newSnapshot;
+	newSnapshot = g_aPlayers[client].hStreak;
+	newSnapshot.hJumps = g_aPlayers[client].hStreak.hJumps.Clone();
+	hStreaks.SetArray(iIndex, newSnapshot, sizeof(CStreak));
 }
 
 void OnPressJump(int client, int iTick, float fVelocity, bool bLeaveGround)
@@ -462,6 +492,11 @@ void OnPressJump(int client, int iTick, float fVelocity, bool bLeaveGround)
 
 					DoStats(client, hJump);
 					hJumps.SetArray(iLength - 1, hJump, sizeof(CJump));
+
+					// Store the finished streak (with its last jump counted), then free the
+					// working list: the snapshot in hStreaks holds its own copy.
+					UpdateLatestStreakSnapshot(client);
+					delete hJumps;
 				}
 				else
 					CurStreak.Reset();
@@ -494,6 +529,10 @@ void OnPressJump(int client, int iTick, float fVelocity, bool bLeaveGround)
 	}
 	else
 	{
+		// No jump has been started yet on this streak — nothing to attach the press to.
+		if (iLength == 0)
+			return;
+
 		iJumpIndex = iLength - 1;
 		hJumps.GetArray(iJumpIndex, hJump, sizeof(CJump));
 	}
@@ -504,17 +543,30 @@ void OnPressJump(int client, int iTick, float fVelocity, bool bLeaveGround)
 		hJumps.SetArray(iJumpIndex, hJump, sizeof(hJump));
 	}
 
-	hJump.iPresses[hJump.iCurrentPress++] = iTick;
+	hJump.iPresses[hJump.iCurrentPress] = iTick;
+	// Until the button is released, the press counts as released on the same tick.
+	hJump.iReleases[hJump.iCurrentPress] = iTick;
+	hJump.iCurrentPress++;
 	hJumps.SetArray(iJumpIndex, hJump, sizeof(hJump));
 }
 
 void OnReleaseJump(int client, int iTick)
 {
-	CJump hJump;
-	g_aPlayers[client].hStreak.hJumps.GetArray(g_aPlayers[client].hStreak.hJumps.Length - 1, hJump, sizeof(CJump));
+	ArrayList hJumps = g_aPlayers[client].hStreak.hJumps;
+	if (hJumps == null || hJumps.Length == 0)
+		return;
 
-	hJump.iPresses[hJump.iCurrentPress - 1] = iTick;
-	g_aPlayers[client].hStreak.hJumps.SetArray(g_aPlayers[client].hStreak.hJumps.Length - 1, hJump, sizeof(CJump));
+	int iIndex = hJumps.Length - 1;
+
+	CJump hJump;
+	hJumps.GetArray(iIndex, hJump, sizeof(CJump));
+
+	// Nothing was pressed yet on this jump — nothing to close.
+	if (hJump.iCurrentPress <= 0)
+		return;
+
+	hJump.iReleases[hJump.iCurrentPress - 1] = iTick;
+	hJumps.SetArray(iIndex, hJump, sizeof(CJump));
 }
 
 void DoStats(int client, CJump hJump)
@@ -524,15 +576,23 @@ void DoStats(int client, CJump hJump)
 	int iTicks = 0;
 	int iLastJunk = 0;
 
-	// Write directly to g_aPlayers[client].hStreak — CStreak is an enum struct and is
-	// always passed by value, so mutations to the local CurStreak copy are discarded.
-	g_aPlayers[client].hStreak.iJumps++;
-	g_aPlayers[client].iJumps++;
-
 	int iStartTick = hJump.iStartTick;
 	int iEndTick = hJump.iEndTick;
 	int iPrevJump = hJump.iPrevJump;
 	int iNextJump = hJump.iNextJump;
+
+	iPresses = hJump.iCurrentPress;
+	iTicks = iEndTick - iStartTick;
+
+	// Guard against malformed jumps (no presses recorded, no valid start/end tick).
+	// Such a jump is not counted at all so it can't skew the ratios.
+	if (iPresses <= 0 || iStartTick < 0 || iEndTick < 0 || iTicks <= 0)
+		return;
+
+	// Write directly to g_aPlayers[client].hStreak — CStreak is an enum struct and is
+	// always passed by value, so mutations to the local CurStreak copy are discarded.
+	g_aPlayers[client].hStreak.iJumps++;
+	g_aPlayers[client].iJumps++;
 
 	if (iPrevJump > 0)
 	{
@@ -543,9 +603,7 @@ void DoStats(int client, CJump hJump)
 		aJumps[iPerf]++;
 	}
 
-	iPresses = hJump.iCurrentPress;
-	iTicks = iEndTick - iStartTick;
-	iLastJunk = iEndTick - hJump.iPresses[iPresses - 1];
+	iLastJunk = iEndTick - hJump.iReleases[iPresses - 1];
 
 	float PressesPerTick = (iPresses * 4.0) / float(iTicks);
 	if (PressesPerTick >= 0.85)
@@ -610,25 +668,38 @@ void DoStats(int client, CJump hJump)
 
 void HandleFlagging(int client, const char[] reason)
 {
+	// The previous detection already scheduled a full stats reset. Until it runs,
+	// the same stats would count as new detections (e.g. twice on the 3rd landing).
+	if (g_bResetPending[client])
+		return;
+
 	g_iFlagged[client]++;
 
-	// Only notify suspected players once
-	if (g_iFlagged[client] == 1)
+	int iMaxFlags = g_iMaxFlags > 0 ? g_iMaxFlags : 1;
+
+	// Not enough detections yet: notify admins about the suspicion (once) and analyse a new streak.
+	if (g_iFlagged[client] < iMaxFlags)
 	{
-		NotifyAdmins(client, reason, false);
+		if (g_iFlagged[client] == 1)
+			NotifyAdmins(client, reason, false);
 		ResetValues(client);
+		ScheduleStatsReset(client);
 		return;
 	}
 
 	// Player is now flagged - Flag him only once
-	if (!g_bFlagged[client] && g_iFlagged[client] >= g_iMaxFlags)
+	if (!g_bFlagged[client])
 	{
 		g_bFlagged[client] = true;
 		NotifyAdmins(client, reason, true);
+
+		// Built here, not per admin, so the forward gets the stats even when no admin is online.
+		PrintStreak(0, client, -1, true);
 		Forward_OnDetected(client, reason, g_sStats);
 		ResetValues(client);
+		ScheduleStatsReset(client);
 
-		if (strcmp(reason, STREAK_HACK, false) == 0 && g_bCurrentHackKick || strcmp(reason, GLOBAL_HACK, false) == 0 && g_bGlobalHackKick)
+		if ((strcmp(reason, STREAK_HACK, false) == 0 && g_bCurrentHackKick) || (strcmp(reason, GLOBAL_HACK, false) == 0 && g_bGlobalHackKick))
 		{
 			LogAction(-1, client, "[AntiBhopCheat] \"%L\" was kicked for using %s", client, reason);
 			KickClient(client, "Turn off your hack!");
@@ -642,8 +713,8 @@ void HandleFlagging(int client, const char[] reason)
 			bool bLimitBhop = CanTestFeatures() && GetFeatureStatus(FeatureType_Native, "LimitBhop") == FeatureStatus_Available;
 
 			if (g_Plugin_SelectiveBhop && bLimitBhop && bIsBhopLimited && !IsBhopLimited(client) &&
-				(strcmp(reason, STREAK_HYPER, false) == 0 && g_bCurrentStreakHyperLimited || strcmp(reason, GLOBAL_HYPER, false) == 0 && g_bGlobalStreakHyperLimited ||
-				strcmp(reason, STREAK_HACK, false) == 0 && g_bCurrentHackHyperLimited || strcmp(reason ,GLOBAL_HACK, false) == 0 && g_bGlobalHackHyperLimited))
+				((strcmp(reason, STREAK_HYPER, false) == 0 && g_bCurrentStreakHyperLimited) || (strcmp(reason, GLOBAL_HYPER, false) == 0 && g_bGlobalStreakHyperLimited) ||
+				(strcmp(reason, STREAK_HACK, false) == 0 && g_bCurrentHackHyperLimited) || (strcmp(reason, GLOBAL_HACK, false) == 0 && g_bGlobalHackHyperLimited)))
 			{
 				LimitBhop(client, true);
 				CPrintToChat(client, "{green}[SM]{red} Your jump settings appear to not be legit.");
@@ -655,40 +726,44 @@ void HandleFlagging(int client, const char[] reason)
 	}
 }
 
-void NotifyAdmins(int client, const char[] sReason, bHighSus = false, bLimitBhop = false)
+void NotifyAdmins(int client, const char[] sReason, bool bHighSus = false, bool bLimitBhop = false)
 {
 	int iUserID = GetClientUserId(client);
 
 	for (int i = 1; i <= MaxClients; i++)
 	{
-		if (IsClientInGame(i) && !IsFakeClient(i) && CheckCommandAccess(i, "sm_stats", ADMFLAG_BAN))
+		if (!IsClientInGame(i) || IsFakeClient(i) || !CheckCommandAccess(i, "sm_stats", ADMFLAG_BAN))
+			continue;
+
+		if (bLimitBhop)
 		{
-			if (bLimitBhop)
-			{
-				CPrintToChat(i, "{green}[SM] {red}The bhop of {olive}%N {red}has been turned off{default} until the end of the map.", client);
-				return;
-			}
+			CPrintToChat(i, "{green}[SM] {red}The bhop of {olive}%N {red}has been turned off{default} until the end of the map.", client);
+			continue;
+		}
 
-			CPrintToChat(i, "{green}[SM] {olive}%N %s suspected of using %s", client, bHighSus ? "{red}is highly" : "{orange}is", sReason);
-			CPrintToChat(i, "{green}[SM] {red}Spectate {orange}the player by typing {red}/spec #%d", iUserID);
-			CPrintToChat(i, "{green}[SM] {fullred}Do not take any actions %s", bHighSus ? "until the player has been spectated and you are 100% sure of the cheat" : "yet");
+		CPrintToChat(i, "{green}[SM] {olive}%N %s suspected of using %s", client, bHighSus ? "{red}is highly" : "{orange}is", sReason);
+		CPrintToChat(i, "{green}[SM] {red}Spectate {orange}the player by typing {red}/spec #%d", iUserID);
+		CPrintToChat(i, "{green}[SM] {fullred}Do not take any actions %s", bHighSus ? "until the player has been spectated and you are 100% sure of the cheat" : "yet");
 
-			PrintStats(i, client);
-			PrintStreak(i, client, -1, true);
+		PrintStats(i, client);
+		PrintStreak(i, client, -1);
 
-			if (bHighSus && g_bNoSound)
-			{
-				if (gEV_Type == Engine_CSS || gEV_Type == Engine_TF2)
-					EmitSoundToClient(i, g_sBeepSound);
-				else
-					ClientCommand(i, "play */%s", g_sBeepSound);
-			}
+		if (bHighSus && g_bNoSound && g_sBeepSound[0] != '\0')
+		{
+			if (gEV_Type == Engine_CSS || gEV_Type == Engine_TF2)
+				EmitSoundToClient(i, g_sBeepSound);
+			else
+				ClientCommand(i, "play */%s", g_sBeepSound);
 		}
 	}
+}
 
-	// Fully reset player stats. We want to analyse a new whole streak.
-	// Pass the UserID (not the client index) so the timer is safe if the player
-	// disconnects before the 0.3 s fires.
+// Fully reset player stats. We want to analyse a new whole streak.
+// Pass the UserID (not the client index) so the timer is safe if the player
+// disconnects before the 0.3 s fires.
+void ScheduleStatsReset(int client)
+{
+	g_bResetPending[client] = true;
 	CreateTimer(0.3, Timer_OnDetected, GetClientUserId(client), TIMER_FLAG_NO_MAPCHANGE);
 }
 
@@ -738,6 +813,12 @@ void PrintStats(int client, int iTarget)
 	PrintToConsole(client, "[SM] Bunnyhop stats for %L", iTarget);
 
 	int iGlobalJumps = g_aPlayers[iTarget].iJumps;
+	if (iGlobalJumps <= 0)
+	{
+		PrintToConsole(client, "No jumps recorded yet for this player.");
+		return;
+	}
+
 	float HyperRatio = g_aPlayers[iTarget].iHyperJumps / float(iGlobalJumps);
 	float HackRatio = g_aPlayers[iTarget].iHackJumps / float(iGlobalJumps);
 
@@ -792,20 +873,41 @@ public Action Command_Streak(int client, int argc)
 	return Plugin_Handled;
 }
 
-void PrintStreak(int client, int iTarget, int iStreak, bool bDetected=false)
+// Sends one line of a streak to the client's console, or with bForward appends it to g_sStats.
+// Returns false once a line no longer fits, so the stats are cut on a whole line.
+static bool StreakLine(int client, bool bForward, const char[] sLine)
 {
-	g_sStats = "";
+	if (!bForward)
+	{
+		PrintToConsole(client, "%s", sLine);
+		return true;
+	}
 
-	PrintToConsole(client, "[SM] Bunnyhop streak %d for %L", iStreak, iTarget);
+	// g_sStats is sized to fit in one Discord message, keep whole lines only.
+	if (strlen(g_sStats) + strlen(sLine) + 1 >= sizeof(g_sStats))
+		return false;
 
-	if (bDetected)
-		FormatEx(g_sStats, sizeof(g_sStats), "%sBunnyhop streak %d for %L\n",
-		g_sStats, iStreak, iTarget);
+	StrCat(g_sStats, sizeof(g_sStats), sLine);
+	StrCat(g_sStats, sizeof(g_sStats), "\n");
+	return true;
+}
+
+// Prints a streak to the client's console. With bForward, writes it to g_sStats
+// instead, for the detection forward.
+void PrintStreak(int client, int iTarget, int iStreak, bool bForward=false)
+{
+	char sLine[1400];
+
+	if (bForward)
+		FormatEx(g_sStats, sizeof(g_sStats), "Bunnyhop streak %d for %L\n", iStreak, iTarget);
+	else
+		PrintToConsole(client, "[SM] Bunnyhop streak %d for %L", iStreak, iTarget);
 
 	ArrayList hStreaks = g_aPlayers[iTarget].hStreaks;
 	CStreak hStreak;
 	hStreak = g_aPlayers[iTarget].hStreak;
-	int iStreaks = hStreaks.Length;
+	// hStreaks is null while the plugin is disabled.
+	int iStreaks = hStreaks != null ? hStreaks.Length : 0;
 
 	// Try showing latest valid streak
 	if (iStreak <= 0 && !hStreak.bValid)
@@ -832,36 +934,33 @@ void PrintStreak(int client, int iTarget, int iStreak, bool bDetected=false)
 	}
 
 	int iStreakJumps = hStreak.iJumps;
+	if (iStreakJumps <= 0)
+	{
+		StreakLine(client, bForward, "No completed streak recorded yet for this player.");
+		return;
+	}
+
 	float HyperRatio = hStreak.iHyperJumps / float(iStreakJumps);
 	float HackRatio = hStreak.iHackJumps / float(iStreakJumps);
 
-	PrintToConsole(client, "Streak jumps: %d | Hyper?: %.1f%% | Hack?: %.1f%%",
+	FormatEx(sLine, sizeof(sLine), "Streak jumps: %d | Hyper?: %.1f%% | Hack?: %.1f%%",
 		iStreakJumps, HyperRatio * 100.0, HackRatio * 100.0);
+	StreakLine(client, bForward, sLine);
 
-	if (bDetected)
-		FormatEx(g_sStats, sizeof(g_sStats), "%sStreak jumps: %d | Hyper?: %.1f%% | Hack?: %.1f%%\n",
-		g_sStats, iStreakJumps, HyperRatio * 100.0, HackRatio * 100.0);
-
-	PrintToConsole(client, "Streak jumps perf group (1 2 +): %1.f%%  %1.f%%  %1.f%%",
+	FormatEx(sLine, sizeof(sLine), "Streak jumps perf group (1 2 +): %1.f%%  %1.f%%  %1.f%%",
 		(hStreak.aJumps[0] / float(iStreakJumps)) * 100.0,
 		(hStreak.aJumps[1] / float(iStreakJumps)) * 100.0,
 		(hStreak.aJumps[2] / float(iStreakJumps)) * 100.0);
+	StreakLine(client, bForward, sLine);
 
-	if (bDetected)
-		Format(g_sStats, sizeof(g_sStats), "%sStreak jumps perf group (1 2 +): %1.f%%  %1.f%%  %1.f%%\n",
-		g_sStats,
-		(hStreak.aJumps[0] / float(iStreakJumps)) * 100.0,
-		(hStreak.aJumps[1] / float(iStreakJumps)) * 100.0,
-		(hStreak.aJumps[2] / float(iStreakJumps)) * 100.0);
-
-	PrintToConsole(client, "#%2s %5s %7s %7s %5s %5s %8s %4s %6s   %s",
+	FormatEx(sLine, sizeof(sLine), "#%2s %5s %7s %7s %5s %5s %8s %4s %6s   %s",
 		"id", " diff", "  invel", " outvel", " gain", " comb", " avgdist", " num", " avg+-", "pattern");
-
-	if (bDetected)
-		FormatEx(g_sStats, sizeof(g_sStats), "%s#%2s %5s %7s %7s %5s %5s %8s %4s %6s   %s\n",
-		g_sStats, "id", " diff", "  invel", " outvel", " gain", " comb", " avgdist", " num", " avg+-", "pattern");
+	StreakLine(client, bForward, sLine);
 
 	ArrayList hJumps = hStreak.hJumps;
+	if (hJumps == null)
+		return;
+
 	float fPrevVel = 0.0;
 	int iPrevEndTick = -1;
 
@@ -874,15 +973,17 @@ void PrintStreak(int client, int iTarget, int iStreak, bool bDetected=false)
 		float fOutVel = hJump.fEndVel;
 		int iEndTick = hJump.iEndTick;
 
-		static char sPattern[1024];
+		char sPattern[1024];
 		int iPatternLen = 0;
+		// Leave room for at least the trailing '|' and '\0' on every append.
+		int iPatternMax = sizeof(sPattern) - 2;
 		int iPrevTick = -1;
 		int iTicks;
 
 		if (iPrevEndTick != -1)
 		{
 			iTicks = hJump.iStartTick - iPrevEndTick;
-			for (int k = 0; k < iTicks && k < 16; k++)
+			for (int k = 0; k < iTicks && k < 16 && iPatternLen < iPatternMax; k++)
 				sPattern[iPatternLen++] = '|';
 		}
 
@@ -890,68 +991,63 @@ void PrintStreak(int client, int iTarget, int iStreak, bool bDetected=false)
 		float fAvgDownUp = 0.0;
 
 		int iPresses = hJump.iCurrentPress;
-		for (int j = iPresses - 1; j >= 0; j--)
+		if (iPresses < 0)
+			iPresses = 0;
+		if (iPresses > MAX_PRESSES)
+			iPresses = MAX_PRESSES;
+
+		// '.' up, '^' press, ',' held, 'v' release
+		for (int j = 0; j < iPresses; j++)
 		{
 			if (iPrevTick != -1)
 			{
 				iTicks = hJump.iPresses[j] - iPrevTick;
-				for (int k = 0; k < iTicks && k < 16; k++)
+				for (int k = 0; k < iTicks && k < 16 && iPatternLen < iPatternMax; k++)
 					sPattern[iPatternLen++] = '.';
 
 				fAvgDist += iTicks;
 			}
 
-			sPattern[iPatternLen++] = '^';
+			if (iPatternLen < iPatternMax)
+				sPattern[iPatternLen++] = '^';
 
-			iTicks = hJump.iPresses[j] - hJump.iPresses[j];
-			for (int k = 0; k < iTicks && k < 16; k++)
+			iTicks = hJump.iReleases[j] - hJump.iPresses[j];
+			for (int k = 0; k < iTicks && k < 16 && iPatternLen < iPatternMax; k++)
 				sPattern[iPatternLen++] = ',';
 
 			fAvgDownUp += iTicks;
 
-			sPattern[iPatternLen++] = 'v';
+			if (iPatternLen < iPatternMax)
+				sPattern[iPatternLen++] = 'v';
 
-			iPrevTick = hJump.iPresses[(j-1 >= 0) ? j-1 : 0];
+			iPrevTick = hJump.iReleases[j];
 		}
 
-		fAvgDist /= iPresses;
-		fAvgDownUp /= iPresses;
+		if (iPresses > 0)
+		{
+			fAvgDist /= iPresses;
+			fAvgDownUp /= iPresses;
+		}
 
 		iTicks = iEndTick - iPrevTick;
-		for (int k = 0; k < iTicks && k < 16; k++)
+		for (int k = 0; k < iTicks && k < 16 && iPatternLen < iPatternMax; k++)
 			sPattern[iPatternLen++] = '.';
 
 		sPattern[iPatternLen++] = '|';
-		sPattern[iPatternLen++] = '\0';
+		sPattern[iPatternLen] = '\0';
 
 		if (fPrevVel == 0.0)
 			fPrevVel = fInVel;
 
-		PrintToConsole(client, "#%2d %4d%% %7.1f %7.1f %4d%% %4d%% %8.2f %4d %6.2f   %s",
-			i,
-			fPrevVel == 0.0 ? 100 : RoundFloat((fInVel / fPrevVel) * 100.0 - 100.0),
-			fInVel,
-			fOutVel,
-			fInVel == 0.0 ? 100 : RoundFloat((fOutVel / fInVel) * 100.0 - 100.0),
-			fPrevVel == 0.0 ? 100 : RoundFloat((fOutVel / fPrevVel) * 100.0 - 100.0),
-			fAvgDist,
-			iPresses,
-			fAvgDownUp,
-			sPattern);
+		int iDiff = (fPrevVel == 0.0) ? 100 : RoundFloat((fInVel / fPrevVel) * 100.0 - 100.0);
+		int iGain = (fInVel == 0.0) ? 100 : RoundFloat((fOutVel / fInVel) * 100.0 - 100.0);
+		int iComb = (fPrevVel == 0.0) ? 100 : RoundFloat((fOutVel / fPrevVel) * 100.0 - 100.0);
 
-		if (bDetected)
-			FormatEx(g_sStats, sizeof(g_sStats), "%s#%2d %4d%% %7.1f %7.1f %4d%% %4d%% %8.2f %4d %6.2f   %s\n",
-			g_sStats,
-			i,
-			fPrevVel == 0.0 ? 100 : RoundFloat((fInVel / fPrevVel) * 100.0 - 100.0),
-			fInVel,
-			fOutVel,
-			fInVel == 0.0 ? 100 : RoundFloat((fOutVel / fInVel) * 100.0 - 100.0),
-			fPrevVel == 0.0 ? 100 : RoundFloat((fOutVel / fPrevVel) * 100.0 - 100.0),
-			fAvgDist,
-			iPresses,
-			fAvgDownUp,
-			sPattern);
+		FormatEx(sLine, sizeof(sLine), "#%2d %4d%% %7.1f %7.1f %4d%% %4d%% %8.2f %4d %6.2f   %s",
+			i, iDiff, fInVel, fOutVel, iGain, iComb, fAvgDist, iPresses, fAvgDownUp, sPattern);
+
+		if (!StreakLine(client, bForward, sLine))
+			return;
 
 		iPrevEndTick = iEndTick;
 		fPrevVel = fOutVel;
@@ -971,6 +1067,22 @@ void Forward_OnDetected(int client, const char[] reason, const char[] stats)
 
 stock void InitPlayerData(int client)
 {
+	// Free anything left over so a second Init (late load + OnClientConnected) can't leak.
+	if (g_aPlayers[client].hStreak.hJumps != null)
+		delete g_aPlayers[client].hStreak.hJumps;
+
+	if (g_aPlayers[client].hStreaks != null)
+	{
+		for (int i = 0; i < g_aPlayers[client].hStreaks.Length; i++)
+		{
+			CStreak hSnapshot;
+			g_aPlayers[client].hStreaks.GetArray(i, hSnapshot, sizeof(CStreak));
+			if (hSnapshot.hJumps != null)
+				delete hSnapshot.hJumps;
+		}
+		delete g_aPlayers[client].hStreaks;
+	}
+
 	g_aPlayers[client].hStreaks = new ArrayList(sizeof(CStreak));
 	g_aPlayers[client].hStreak.hJumps = new ArrayList(sizeof(CJump));
 	ResetValues(client);
@@ -985,6 +1097,7 @@ stock void ResetValues(int client)
 
 stock void ResetPlayerData(int client)
 {
+	g_bResetPending[client] = false;
 	g_aPlayers[client].Reset();
 	InitPlayerData(client);
 }
