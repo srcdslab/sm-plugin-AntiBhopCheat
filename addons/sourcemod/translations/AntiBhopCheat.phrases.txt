@@ -1,0 +1,163 @@
+"Phrases"
+{
+	"Kick Turn Off Hack"
+	{
+		"en"		"Turn off your hack!"
+		"fr"		"Désactivez votre cheat !"
+		"ru"		"Отключите свой чит!"
+		"es"		"¡Desactiva tu hack!"
+		"de"		"Schalte deinen Hack aus!"
+		"pt"		"Desligue seu hack!"
+		"chi"		"关掉你的外挂！"
+	}
+
+	"Jump Settings Not Legit"
+	{
+		"en"		"{red}Your jump settings do not appear to be legit."
+		"fr"		"{red}Vos paramètres de saut ne semblent pas légitimes."
+		"ru"		"{red}Ваши настройки прыжка не выглядят честными."
+		"es"		"{red}Tu configuración de salto no parece legítima."
+		"de"		"{red}Deine Sprungeinstellungen scheinen nicht legitim zu sein."
+		"pt"		"{red}Suas configurações de pulo não parecem legítimas."
+		"chi"		"{red}你的跳跃设置看起来不正常。"
+	}
+
+	"Bhop Turned Off Self"
+	{
+		"en"		"{red}Your bhop has been {fullred}turned off{red} until the end of the map."
+		"fr"		"{red}Votre bhop a été {fullred}désactivé{red} jusqu'à la fin de la map."
+		"ru"		"{red}Ваш бхоп {fullred}отключён{red} до конца карты."
+		"es"		"{red}Tu bhop ha sido {fullred}desactivado{red} hasta el final del mapa."
+		"de"		"{red}Dein Bhop wurde bis zum Ende der Map {fullred}deaktiviert{red}."
+		"pt"		"{red}Seu bhop foi {fullred}desativado{red} até o fim do mapa."
+		"chi"		"{red}你的连跳已被{fullred}关闭{red}，直到本地图结束。"
+	}
+
+	"Bhop Turned Off Admin"
+	{
+		"#format"	"{1:N}"
+		"en"		"{red}The bhop of {olive}{1} {red}has been turned off{default} until the end of the map."
+		"fr"		"{red}Le bhop de {olive}{1} {red}a été désactivé{default} jusqu'à la fin de la map."
+		"ru"		"{red}Бхоп игрока {olive}{1} {red}отключён{default} до конца карты."
+		"es"		"{red}El bhop de {olive}{1} {red}ha sido desactivado{default} hasta el final del mapa."
+		"de"		"{red}Der Bhop von {olive}{1} {red}wurde{default} bis zum Ende der Map {red}deaktiviert{default}."
+		"pt"		"{red}O bhop de {olive}{1} {red}foi desativado{default} até o fim do mapa."
+		"chi"		"{olive}{1} {red}的连跳已被关闭{default}，直到本地图结束。"
+	}
+
+	"Suspected"
+	{
+		"#format"	"{1:N},{2:s}"
+		"en"		"{olive}{1} {orange}is suspected of using {2}"
+		"fr"		"{olive}{1} {orange}est soupçonné d'utiliser {2}"
+		"ru"		"{olive}{1} {orange}подозревается в использовании {2}"
+		"es"		"{olive}{1} {orange}es sospechoso de usar {2}"
+		"de"		"{olive}{1} {orange}steht im Verdacht, {2} zu nutzen"
+		"pt"		"{olive}{1} {orange}é suspeito de usar {2}"
+		"chi"		"{olive}{1} {orange}涉嫌使用 {2}"
+	}
+
+	"Suspected Highly"
+	{
+		"#format"	"{1:N},{2:s}"
+		"en"		"{olive}{1} {red}is highly suspected of using {2}"
+		"fr"		"{olive}{1} {red}est fortement soupçonné d'utiliser {2}"
+		"ru"		"{olive}{1} {red}сильно подозревается в использовании {2}"
+		"es"		"{olive}{1} {red}es muy sospechoso de usar {2}"
+		"de"		"{olive}{1} {red}steht unter starkem Verdacht, {2} zu nutzen"
+		"pt"		"{olive}{1} {red}é fortemente suspeito de usar {2}"
+		"chi"		"{olive}{1} {red}高度涉嫌使用 {2}"
+	}
+
+	"Spectate Suspect"
+	{
+		"#format"	"{1:d}"
+		"en"		"{red}Spectate {orange}the player by typing {red}/spec #{1}"
+		"fr"		"{red}Observez {orange}le joueur en tapant {red}/spec #{1}"
+		"ru"		"{red}Наблюдайте {orange}за игроком, введя {red}/spec #{1}"
+		"es"		"{red}Observa {orange}al jugador escribiendo {red}/spec #{1}"
+		"de"		"{red}Beobachte {orange}den Spieler, indem du {red}/spec #{1} {orange}eingibst"
+		"pt"		"{red}Observe {orange}o jogador digitando {red}/spec #{1}"
+		"chi"		"{orange}输入 {red}/spec #{1} {orange}来{red}观察{orange}该玩家"
+	}
+
+	"No Action Yet"
+	{
+		"en"		"{fullred}Do not take any action yet"
+		"fr"		"{fullred}Ne prenez encore aucune mesure"
+		"ru"		"{fullred}Пока не предпринимайте никаких действий"
+		"es"		"{fullred}No tomes ninguna medida todavía"
+		"de"		"{fullred}Unternimm noch nichts"
+		"pt"		"{fullred}Não tome nenhuma ação ainda"
+		"chi"		"{fullred}暂时不要采取任何行动"
+	}
+
+	"No Action Until Sure"
+	{
+		"en"		"{fullred}Do not take any action until the player has been spectated and you are 100%% sure of the cheat"
+		"fr"		"{fullred}Ne prenez aucune mesure avant d'avoir observé le joueur et d'être sûr à 100%% de la triche"
+		"ru"		"{fullred}Не предпринимайте никаких действий, пока не понаблюдаете за игроком и не будете на 100%% уверены в чите"
+		"es"		"{fullred}No tomes ninguna medida hasta haber observado al jugador y estar 100%% seguro de la trampa"
+		"de"		"{fullred}Unternimm nichts, bevor du den Spieler beobachtet hast und dir beim Cheat zu 100%% sicher bist"
+		"pt"		"{fullred}Não tome nenhuma ação até ter observado o jogador e estar 100%% certo da trapaça"
+		"chi"		"{fullred}在观察该玩家并 100%% 确定其作弊之前，不要采取任何行动"
+	}
+
+	"Stats Usage"
+	{
+		"en"		"Usage: sm_stats <#userid|name>"
+		"fr"		"Utilisation : sm_stats <#userid|name>"
+		"ru"		"Использование: sm_stats <#userid|name>"
+		"es"		"Uso: sm_stats <#userid|name>"
+		"de"		"Verwendung: sm_stats <#userid|name>"
+		"pt"		"Uso: sm_stats <#userid|name>"
+		"chi"		"用法：sm_stats <#userid|name>"
+	}
+
+	"Streak Usage"
+	{
+		"en"		"Usage: sm_streak <#userid|name> [streak]"
+		"fr"		"Utilisation : sm_streak <#userid|name> [streak]"
+		"ru"		"Использование: sm_streak <#userid|name> [streak]"
+		"es"		"Uso: sm_streak <#userid|name> [streak]"
+		"de"		"Verwendung: sm_streak <#userid|name> [streak]"
+		"pt"		"Uso: sm_streak <#userid|name> [streak]"
+		"chi"		"用法：sm_streak <#userid|name> [streak]"
+	}
+
+	"Streak Out Of Bounds"
+	{
+		"#format"	"{1:d}"
+		"en"		"Streak is out of bounds (max. {1})!"
+		"fr"		"Série hors limites (max. {1}) !"
+		"ru"		"Номер серии вне диапазона (макс. {1})!"
+		"es"		"¡La racha está fuera de rango (máx. {1})!"
+		"de"		"Die Serie liegt außerhalb des Bereichs (max. {1})!"
+		"pt"		"A sequência está fora do limite (máx. {1})!"
+		"chi"		"连跳序列超出范围（最大 {1}）！"
+	}
+
+	"Streak Available Single"
+	{
+		"#format"	"{1:d}"
+		"en"		"Only {olive}{1} {default}streak is available for this player right now!"
+		"fr"		"Seulement {olive}{1} {default}série disponible pour ce joueur pour le moment !"
+		"ru"		"Сейчас для этого игрока доступна только {olive}{1} {default}серия!"
+		"es"		"¡Solo hay {olive}{1} {default}racha disponible para este jugador ahora mismo!"
+		"de"		"Für diesen Spieler ist derzeit nur {olive}{1} {default}Serie verfügbar!"
+		"pt"		"Só há {olive}{1} {default}sequência disponível para este jogador no momento!"
+		"chi"		"该玩家目前只有 {olive}{1} {default}个连跳序列可用！"
+	}
+
+	"Streaks Available Multiple"
+	{
+		"#format"	"{1:d}"
+		"en"		"Only {olive}{1} {default}streaks are available for this player right now!"
+		"fr"		"Seulement {olive}{1} {default}séries disponibles pour ce joueur pour le moment !"
+		"ru"		"Сейчас для этого игрока доступно серий: только {olive}{1}{default}!"
+		"es"		"¡Solo hay {olive}{1} {default}rachas disponibles para este jugador ahora mismo!"
+		"de"		"Für diesen Spieler sind derzeit nur {olive}{1} {default}Serien verfügbar!"
+		"pt"		"Só há {olive}{1} {default}sequências disponíveis para este jogador no momento!"
+		"chi"		"该玩家目前只有 {olive}{1} {default}个连跳序列可用！"
+	}
+}

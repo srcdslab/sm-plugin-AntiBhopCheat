@@ -70,7 +70,7 @@ public Plugin myinfo =
 	name			= "AntiBhopCheat",
 	author			= "BotoX, .Rushaway",
 	description		= "Detect all kinds of bhop cheats",
-	version			= "1.9.0",
+	version			= "1.9.1",
 	url				= ""
 };
 
@@ -86,6 +86,7 @@ public APLRes AskPluginLoad2(Handle myself, bool late, char[] error, int err_max
 public void OnPluginStart()
 {
 	LoadTranslations("common.phrases");
+	LoadTranslations("AntiBhopCheat.phrases");
 
 	g_cvEnabled = CreateConVar("sm_antibhopcheat_enabled", "1", "Enable/Disable AntiBhopCheat plugin [0 = disabled, 1 = enabled]", FCVAR_NOTIFY, true, 0.0, true, 1.0);
 
@@ -631,7 +632,7 @@ void HandleFlagging(int client, const char[] reason)
 		if (strcmp(reason, STREAK_HACK, false) == 0 && g_bCurrentHackKick || strcmp(reason, GLOBAL_HACK, false) == 0 && g_bGlobalHackKick)
 		{
 			LogAction(-1, client, "[AntiBhopCheat] \"%L\" was kicked for using %s", client, reason);
-			KickClient(client, "Turn off your hack!");
+			KickClient(client, "%t", "Kick Turn Off Hack");
 			return;
 		}
 	#if defined _SelectiveBhop_Included
@@ -646,8 +647,8 @@ void HandleFlagging(int client, const char[] reason)
 				strcmp(reason, STREAK_HACK, false) == 0 && g_bCurrentHackHyperLimited || strcmp(reason ,GLOBAL_HACK, false) == 0 && g_bGlobalHackHyperLimited))
 			{
 				LimitBhop(client, true);
-				CPrintToChat(client, "{green}[SM]{red} Your jump settings appear to not be legit.");
-				CPrintToChat(client, "{green}[SM]{red} Your bhop has been {fullred}turned off{red} until the end of the map.");
+				CPrintToChat(client, "{green}[SM] %t", "Jump Settings Not Legit");
+				CPrintToChat(client, "{green}[SM] %t", "Bhop Turned Off Self");
 				NotifyAdmins(client, "", false, true);
 			}
 		}
@@ -665,13 +666,13 @@ void NotifyAdmins(int client, const char[] sReason, bHighSus = false, bLimitBhop
 		{
 			if (bLimitBhop)
 			{
-				CPrintToChat(i, "{green}[SM] {red}The bhop of {olive}%N {red}has been turned off{default} until the end of the map.", client);
+				CPrintToChat(i, "{green}[SM] %t", "Bhop Turned Off Admin", client);
 				return;
 			}
 
-			CPrintToChat(i, "{green}[SM] {olive}%N %s suspected of using %s", client, bHighSus ? "{red}is highly" : "{orange}is", sReason);
-			CPrintToChat(i, "{green}[SM] {red}Spectate {orange}the player by typing {red}/spec #%d", iUserID);
-			CPrintToChat(i, "{green}[SM] {fullred}Do not take any actions %s", bHighSus ? "until the player has been spectated and you are 100% sure of the cheat" : "yet");
+			CPrintToChat(i, "{green}[SM] %t", bHighSus ? "Suspected Highly" : "Suspected", client, sReason);
+			CPrintToChat(i, "{green}[SM] %t", "Spectate Suspect", iUserID);
+			CPrintToChat(i, "{green}[SM] %t", bHighSus ? "No Action Until Sure" : "No Action Yet");
 
 			PrintStats(i, client);
 			PrintStreak(i, client, -1, true);
@@ -706,7 +707,7 @@ public Action Command_Stats(int client, int argc)
 {
 	if (argc < 1 || argc > 2)
 	{
-		CReplyToCommand(client, "{green}[SM] {default}Usage: sm_stats <#userid|name>");
+		CReplyToCommand(client, "{green}[SM] {default}%t", "Stats Usage");
 		return Plugin_Handled;
 	}
 
@@ -757,7 +758,7 @@ public Action Command_Streak(int client, int argc)
 {
 	if (argc < 1 || argc > 2)
 	{
-		CReplyToCommand(client, "{green}[SM] {default}Usage: sm_streak <#userid|name> [streak]");
+		CReplyToCommand(client, "{green}[SM] {default}%t", "Streak Usage");
 		return Plugin_Handled;
 	}
 
@@ -817,14 +818,14 @@ void PrintStreak(int client, int iTarget, int iStreak, bool bDetected=false)
 	{
 		if (iStreak > MAX_STREAKS)
 		{
-			CReplyToCommand(client, "{green}[SM] {default}Streak is out of bounds (max. %d)!", MAX_STREAKS);
+			CReplyToCommand(client, "{green}[SM] {default}%t", "Streak Out Of Bounds", MAX_STREAKS);
 			return;
 		}
 
 		int iIndex = iStreaks - iStreak;
 		if (iIndex < 0)
 		{
-			CReplyToCommand(client, "{green}[SM] {default}Only {olive}%d {default}streaks are available for this player right now!", iStreaks);
+			CReplyToCommand(client, "{green}[SM] {default}%t", iStreaks == 1 ? "Streak Available Single" : "Streaks Available Multiple", iStreaks);
 			return;
 		}
 
