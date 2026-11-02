@@ -73,7 +73,7 @@ public Plugin myinfo =
 	name			= "AntiBhopCheat",
 	author			= "BotoX, .Rushaway",
 	description		= "Detect all kinds of bhop cheats",
-	version			= "1.9.1",
+	version			= "1.9.2",
 	url				= ""
 };
 
