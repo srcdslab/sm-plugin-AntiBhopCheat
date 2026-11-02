@@ -492,8 +492,6 @@ void OnPressJump(int client, int iTick, float fVelocity, bool bLeaveGround)
 			{
 				if (CurStreak.bValid)
 				{
-					CurStreak.iEndTick = iTick;
-
 					DoStats(client, hJump);
 					hJumps.SetArray(iLength - 1, hJump, sizeof(CJump));
 
