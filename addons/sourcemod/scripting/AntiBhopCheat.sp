@@ -21,6 +21,9 @@
 #tryinclude <SelectiveBhop>
 #define REQUIRE_PLUGIN
 
+#pragma semicolon 1
+#pragma newdecls required
+
 CPlayer g_aPlayers[MAXPLAYERS + 1];
 EngineVersion gEV_Type = Engine_Unknown;
 
@@ -70,7 +73,7 @@ public Plugin myinfo =
 	name			= "AntiBhopCheat",
 	author			= "BotoX, .Rushaway",
 	description		= "Detect all kinds of bhop cheats",
-	version			= "1.9.1",
+	version			= "1.9.2",
 	url				= ""
 };
 
@@ -656,7 +659,7 @@ void HandleFlagging(int client, const char[] reason)
 	}
 }
 
-void NotifyAdmins(int client, const char[] sReason, bHighSus = false, bLimitBhop = false)
+void NotifyAdmins(int client, const char[] sReason, bool bHighSus = false, bool bLimitBhop = false)
 {
 	int iUserID = GetClientUserId(client);
 
