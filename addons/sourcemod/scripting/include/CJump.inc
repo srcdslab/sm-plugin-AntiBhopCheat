@@ -14,6 +14,7 @@ enum struct CJump
 	int iNextJump;
 	
 	int iPresses[MAX_PRESSES];
+	int iReleases[MAX_PRESSES];
 	int iCurrentPress;
 
 	void Reset()
@@ -27,6 +28,10 @@ enum struct CJump
 		this.iNextJump = -1;
 
 		for (int i = 0; i < MAX_PRESSES; i++)
+		{
 			this.iPresses[i] = -1;
+			this.iReleases[i] = -1;
+		}
+		this.iCurrentPress = 0;
 	}
 }
