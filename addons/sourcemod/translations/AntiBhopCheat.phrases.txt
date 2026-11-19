@@ -9,6 +9,12 @@
 		"de"		"Schalte deinen Hack aus!"
 		"pt"		"Desligue seu hack!"
 		"chi"		"关掉你的外挂！"
+		"pl"		"Wyłącz swojego cheata!"
+		"tr"		"Hileni kapat!"
+		"it"		"Disattiva il tuo cheat!"
+		"ua"		"Вимкни свій чит!"
+		"zho"		"關閉你的外掛！"
+		"cze"		"Vypni svůj cheat!"
 	}
 
 	"Jump Settings Not Legit"
@@ -20,6 +26,12 @@
 		"de"		"{red}Deine Sprungeinstellungen scheinen nicht legitim zu sein."
 		"pt"		"{red}Suas configurações de pulo não parecem legítimas."
 		"chi"		"{red}你的跳跃设置看起来不正常。"
+		"pl"		"{red}Twoje ustawienia skoku nie wyglądają na legalne."
+		"tr"		"{red}Zıplama ayarların meşru görünmüyor."
+		"it"		"{red}Le tue impostazioni di salto non sembrano legittime."
+		"ua"		"{red}Твої налаштування стрибків не схожі на легітимні."
+		"zho"		"{red}你的跳躍設定看起來不正常。"
+		"cze"		"{red}Tvé nastavení skoku nevypadá legitimně."
 	}
 
 	"Bhop Turned Off Self"
@@ -31,6 +43,12 @@
 		"de"		"{red}Dein Bhop wurde bis zum Ende der Map {fullred}deaktiviert{red}."
 		"pt"		"{red}Seu bhop foi {fullred}desativado{red} até o fim do mapa."
 		"chi"		"{red}你的连跳已被{fullred}关闭{red}，直到本地图结束。"
+		"pl"		"{red}Twój bhop został {fullred}wyłączony{red} do końca mapy."
+		"tr"		"{red}Bhop'un harita sonuna kadar {fullred}kapatıldı{red}."
+		"it"		"{red}Il tuo bhop è stato {fullred}disattivato{red} fino alla fine della mappa."
+		"ua"		"{red}Твій бхоп {fullred}вимкнено{red} до кінця мапи."
+		"zho"		"{red}你的連跳已被{fullred}關閉{red}，直到地圖結束。"
+		"cze"		"{red}Tvůj bhop byl {fullred}vypnut{red} do konce mapy."
 	}
 
 	"Bhop Turned Off Admin"
@@ -43,6 +61,12 @@
 		"de"		"{red}Der Bhop von {olive}{1} {red}wurde{default} bis zum Ende der Map {red}deaktiviert{default}."
 		"pt"		"{red}O bhop de {olive}{1} {red}foi desativado{default} até o fim do mapa."
 		"chi"		"{olive}{1} {red}的连跳已被关闭{default}，直到本地图结束。"
+		"pl"		"{red}Bhop gracza {olive}{1} {red}został wyłączony{default} do końca mapy."
+		"tr"		"{red}{olive}{1} {red}oyuncusunun bhop'u{default} harita sonuna kadar kapatıldı."
+		"it"		"{red}Il bhop di {olive}{1} {red}è stato disattivato{default} fino alla fine della mappa."
+		"ua"		"{red}Бхоп гравця {olive}{1} {red}вимкнено{default} до кінця мапи."
+		"zho"		"{olive}{1} {red}的連跳已被關閉{default}，直到地圖結束。"
+		"cze"		"{red}Bhop hráče {olive}{1} {red}byl vypnut{default} do konce mapy."
 	}
 
 	"Suspected"
@@ -55,6 +79,12 @@
 		"de"		"{olive}{1} {orange}steht im Verdacht, {2} zu nutzen"
 		"pt"		"{olive}{1} {orange}é suspeito de usar {2}"
 		"chi"		"{olive}{1} {orange}涉嫌使用 {2}"
+		"pl"		"{olive}{1} {orange}jest podejrzewany o używanie {2}"
+		"tr"		"{olive}{1} {orange}oyuncusunun {2} kullandığından şüpheleniliyor"
+		"it"		"{olive}{1} {orange}è sospettato di usare {2}"
+		"ua"		"{olive}{1} {orange}підозрюється у використанні {2}"
+		"zho"		"{olive}{1} {orange}涉嫌使用 {2}"
+		"cze"		"{olive}{1} {orange}je podezřelý z používání {2}"
 	}
 
 	"Suspected Highly"
@@ -67,6 +97,12 @@
 		"de"		"{olive}{1} {red}steht unter starkem Verdacht, {2} zu nutzen"
 		"pt"		"{olive}{1} {red}é fortemente suspeito de usar {2}"
 		"chi"		"{olive}{1} {red}高度涉嫌使用 {2}"
+		"pl"		"{olive}{1} {red}jest bardzo mocno podejrzewany o używanie {2}"
+		"tr"		"{olive}{1} {red}oyuncusunun {2} kullandığından güçlü şekilde şüpheleniliyor"
+		"it"		"{olive}{1} {red}è fortemente sospettato di usare {2}"
+		"ua"		"{olive}{1} {red}дуже сильно підозрюється у використанні {2}"
+		"zho"		"{olive}{1} {red}高度涉嫌使用 {2}"
+		"cze"		"{olive}{1} {red}je velmi silně podezřelý z používání {2}"
 	}
 
 	"Spectate Suspect"
@@ -79,6 +115,12 @@
 		"de"		"{red}Beobachte {orange}den Spieler, indem du {red}/spec #{1} {orange}eingibst"
 		"pt"		"{red}Observe {orange}o jogador digitando {red}/spec #{1}"
 		"chi"		"{orange}输入 {red}/spec #{1} {orange}来{red}观察{orange}该玩家"
+		"pl"		"{red}Obserwuj {orange}gracza, wpisując {red}/spec #{1}"
+		"tr"		"{red}Oyuncuyu izlemek için {orange}şunu yaz: {red}/spec #{1}"
+		"it"		"{red}Osserva {orange}il giocatore scrivendo {red}/spec #{1}"
+		"ua"		"{red}Спостерігай {orange}за гравцем, ввівши {red}/spec #{1}"
+		"zho"		"{red}輸入 {red}/spec #{1} {orange}來觀戰該玩家"
+		"cze"		"{red}Sleduj {orange}hráče zadáním {red}/spec #{1}"
 	}
 
 	"No Action Yet"
@@ -90,6 +132,12 @@
 		"de"		"{fullred}Unternimm noch nichts"
 		"pt"		"{fullred}Não tome nenhuma ação ainda"
 		"chi"		"{fullred}暂时不要采取任何行动"
+		"pl"		"{fullred}Nie podejmuj jeszcze żadnych działań"
+		"tr"		"{fullred}Henüz hiçbir işlem yapma"
+		"it"		"{fullred}Non intraprendere ancora alcuna azione"
+		"ua"		"{fullred}Поки не вживай жодних дій"
+		"zho"		"{fullred}請先不要採取任何行動"
+		"cze"		"{fullred}Zatím nepodnikej žádné kroky"
 	}
 
 	"No Action Until Sure"
@@ -101,6 +149,12 @@
 		"de"		"{fullred}Unternimm nichts, bevor du den Spieler beobachtet hast und dir beim Cheat zu 100%% sicher bist"
 		"pt"		"{fullred}Não tome nenhuma ação até ter observado o jogador e estar 100%% certo da trapaça"
 		"chi"		"{fullred}在观察该玩家并 100%% 确定其作弊之前，不要采取任何行动"
+		"pl"		"{fullred}Nie podejmuj żadnych działań, dopóki gracz nie zostanie sprawdzony na spectatorze i nie będziesz w 100%% pewien cheatów"
+		"tr"		"{fullred}Oyuncuyu izleyip hileden %%100 emin olana kadar hiçbir işlem yapma"
+		"it"		"{fullred}Non intraprendere alcuna azione finché il giocatore non è stato osservato e non sei sicuro al 100%% del cheat"
+		"ua"		"{fullred}Не вживай жодних дій, доки не поспостерігаєш за гравцем і не будеш на 100%% певен у читі"
+		"zho"		"{fullred}在觀戰該玩家並 100%% 確定其作弊之前，請不要採取任何行動"
+		"cze"		"{fullred}Nepodnikej žádné kroky, dokud hráče nesleduješ a nejsi si na 100%% jistý cheatem"
 	}
 
 	"Stats Usage"
@@ -112,6 +166,12 @@
 		"de"		"Verwendung: sm_stats <#userid|name>"
 		"pt"		"Uso: sm_stats <#userid|name>"
 		"chi"		"用法：sm_stats <#userid|name>"
+		"pl"		"Użycie: sm_stats <#userid|nazwa>"
+		"tr"		"Kullanım: sm_stats <#userid|isim>"
+		"it"		"Uso: sm_stats <#userid|nome>"
+		"ua"		"Використання: sm_stats <#userid|ім'я>"
+		"zho"		"用法：sm_stats <#userid|名稱>"
+		"cze"		"Použití: sm_stats <#userid|jméno>"
 	}
 
 	"Streak Usage"
@@ -123,6 +183,12 @@
 		"de"		"Verwendung: sm_streak <#userid|name> [streak]"
 		"pt"		"Uso: sm_streak <#userid|name> [streak]"
 		"chi"		"用法：sm_streak <#userid|name> [streak]"
+		"pl"		"Użycie: sm_streak <#userid|nazwa> [seria]"
+		"tr"		"Kullanım: sm_streak <#userid|isim> [seri]"
+		"it"		"Uso: sm_streak <#userid|nome> [serie]"
+		"ua"		"Використання: sm_streak <#userid|ім'я> [серія]"
+		"zho"		"用法：sm_streak <#userid|名稱> [連跳段]"
+		"cze"		"Použití: sm_streak <#userid|jméno> [série]"
 	}
 
 	"Streak Out Of Bounds"
@@ -135,6 +201,12 @@
 		"de"		"Die Serie liegt außerhalb des Bereichs (max. {1})!"
 		"pt"		"A sequência está fora do limite (máx. {1})!"
 		"chi"		"连跳序列超出范围（最大 {1}）！"
+		"pl"		"Seria jest poza zakresem (maks. {1})!"
+		"tr"		"Seri sınırların dışında (maks. {1})!"
+		"it"		"La serie è fuori dai limiti (max. {1})!"
+		"ua"		"Серія поза межами (макс. {1})!"
+		"zho"		"連跳段超出範圍（最大 {1}）！"
+		"cze"		"Série je mimo rozsah (max. {1})!"
 	}
 
 	"Streak Available Single"
@@ -147,6 +219,12 @@
 		"de"		"Für diesen Spieler ist derzeit nur {olive}{1} {default}Serie verfügbar!"
 		"pt"		"Só há {olive}{1} {default}sequência disponível para este jogador no momento!"
 		"chi"		"该玩家目前只有 {olive}{1} {default}个连跳序列可用！"
+		"pl"		"Dla tego gracza dostępna jest teraz tylko {olive}{1} {default}seria!"
+		"tr"		"Bu oyuncu için şu anda yalnızca {olive}{1} {default}seri mevcut!"
+		"it"		"Al momento è disponibile solo {olive}{1} {default}serie per questo giocatore!"
+		"ua"		"Наразі для цього гравця доступна лише {olive}{1} {default}серія!"
+		"zho"		"此玩家目前只有 {olive}{1} {default}個連跳段可用！"
+		"cze"		"Pro tohoto hráče je právě dostupná jen {olive}{1} {default}série!"
 	}
 
 	"Streaks Available Multiple"
@@ -159,5 +237,11 @@
 		"de"		"Für diesen Spieler sind derzeit nur {olive}{1} {default}Serien verfügbar!"
 		"pt"		"Só há {olive}{1} {default}sequências disponíveis para este jogador no momento!"
 		"chi"		"该玩家目前只有 {olive}{1} {default}个连跳序列可用！"
+		"pl"		"Dla tego gracza dostępne są teraz tylko {olive}{1} {default}serie!"
+		"tr"		"Bu oyuncu için şu anda yalnızca {olive}{1} {default}seri mevcut!"
+		"it"		"Al momento sono disponibili solo {olive}{1} {default}serie per questo giocatore!"
+		"ua"		"Наразі для цього гравця доступно лише {olive}{1} {default}серій!"
+		"zho"		"此玩家目前只有 {olive}{1} {default}個連跳段可用！"
+		"cze"		"Pro tohoto hráče jsou právě dostupné jen {olive}{1} {default}série!"
 	}
 }
